@@ -1,10 +1,20 @@
+# Python / Node / Docker cruft
 __pycache__/
-*.pyc
 venv/
-.env
 node_modules/
-.next/
+.env
 *.log
-*.db
+*.pem
+*.crt
+*.key
+*.sqlite
 data/
 logs/
+
+# Docker runtime
+*.pid
+*.sock
+
+# IDEs
+.vscode/
+.idea/

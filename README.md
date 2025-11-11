@@ -1,89 +1,94 @@
-# CompliancePulse
+# CompliancePulse - Universal Compliance Scanner
 
-Security compliance monitoring and scanning platform for Linux systems.
+Universal installer supporting macOS, Linux, and Windows WSL.
 
 ## Quick Start
 
+### 1. Run a Compliance Scan
 ```bash
-# Start services
-docker compose up -d
-
-# View logs
-docker compose logs -f
-
-# Stop services
-docker compose down
+./scripts/run_scan.sh
 ```
 
-## Access Points
-
-- **Frontend Dashboard**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs
-
-## Development
-
+### 2. Start the API Server
 ```bash
-# Rebuild after code changes
-docker compose up -d --build
+./scripts/start_api.sh
+```
 
-# Run agent locally
-cd agent
-python3 scan_agent.py <hostname> [ip]
+### 3. Configure OpenAI API Key
+```bash
+./scripts/config.sh set-api-key YOUR_OPENAI_KEY
+```
 
-# View backend logs
-docker compose logs -f backend
+### 4. View Configuration
+```bash
+./scripts/config.sh show-config
+./scripts/config.sh show-token
+```
 
-# Check service health
+## Directory Structure
+
+```
+compliancepulse/
+├── backend/          # FastAPI application
+├── scripts/          # Utility scripts
+├── config/           # Configuration files (.env)
+├── data/             # Compliance reports
+├── certs/            # TLS certificates
+├── logs/             # Log files
+└── venv/             # Python virtual environment
+```
+
+## API Endpoints
+
+### Health Check (No Auth Required)
+```bash
 curl http://localhost:8000/health
 ```
 
-## Architecture
+### Get Latest Report
+```bash
+curl -H "Authorization: Bearer YOUR_API_TOKEN" \
+  http://localhost:8000/api/report
+```
 
-- **Backend**: FastAPI + SQLModel (Python 3.11)
-- **Frontend**: Static HTML + Vanilla JS
-- **Database**: SQLite (persistent volume)
-- **Agent**: Python scanning script
+### Get Report History
+```bash
+curl -H "Authorization: Bearer YOUR_API_TOKEN" \
+  http://localhost:8000/api/reports/history?limit=10
+```
 
-## Data Persistence
+## Environment Support
 
-- Database: `./data/compliancepulse.db`
-- Logs: `./logs/`
-
-## Phase 0.1 Features
-
-✓ FastAPI backend with health checks  
-✓ Interactive web dashboard  
-✓ Mock scanning agent  
-✓ Data persistence with volumes  
-✓ CORS support  
-✓ System and report tracking  
-
-## Roadmap
-
-**Phase 1**: Real SSH-based scanning, authentication, PostgreSQL  
-**Phase 2**: Enhanced dashboard, real-time updates, reporting  
-**Phase 3**: Multi-node scanning, compliance frameworks, alerting  
+- ✅ macOS (Intel & Apple Silicon)
+- ✅ Rocky Linux / RHEL / CentOS
+- ✅ Ubuntu / Debian
+- ✅ Windows WSL2
+- ✅ Development mode (no root required)
 
 ## Troubleshooting
 
+### Check Logs
 ```bash
-# Check container status
-docker compose ps
-
-# View all logs
-docker compose logs
-
-# Restart services
-docker compose restart
-
-# Clean rebuild
-docker compose down && docker compose up -d --build
-
-# Check firewall
-sudo firewall-cmd --list-ports
+tail -f logs/scan.log
+tail -f logs/api.log
 ```
 
-## Support
+### Reset Configuration
+```bash
+./scripts/config.sh reset-token
+```
 
-For issues or questions, check `/var/log/compliancepulse-install.log`
+### Reinstall Python Dependencies
+```bash
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+## Security Notes
+
+- Tokens are stored in `config/.env` (chmod 600)
+- Self-signed certificates are used (replace for production)
+- Sensitive data is automatically redacted from reports
+- API key is never logged
+

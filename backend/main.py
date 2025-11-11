@@ -1,16 +1,19 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from sqlmodel import SQLModel, Field, create_engine, Session, select
+import json
 import os
+from pathlib import Path
 from datetime import datetime
 
-app = FastAPI(
-    title="CompliancePulse API",
-    version="0.1.0",
-    description="Compliance monitoring and scanning API"
-)
+app = FastAPI(title="CompliancePulse API", version="0.3.0")
+security = HTTPBearer()
 
+# Load config
+API_TOKEN = os.getenv("API_TOKEN", "")
+DATA_DIR = Path(os.getenv("BASE_DIR", "/opt/compliancepulse")) / "data"
+
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,111 +22,71 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DB_URL = os.getenv("DB_URL", "sqlite:////app/data/compliancepulse.db")
-engine = create_engine(DB_URL, echo=True)
-
-class System(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    hostname: str = Field(index=True)
-    ip: str | None = None
-    os_version: str | None = None
-    last_scan: str | None = None
-    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-
-class Report(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    system_id: int = Field(foreign_key="system.id")
-    score: int = Field(ge=0, le=100)
-    issues_json: str
-    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-
-class ScanRequest(BaseModel):
-    hostname: str
-    ip: str | None = None
-
-class ScanResponse(BaseModel):
-    hostname: str
-    score: int
-    issues: list[str]
-    scan_time: str
-
-@app.on_event("startup")
-def on_startup():
-    SQLModel.metadata.create_all(engine)
-    print("✓ Database initialized")
-
-@app.get("/")
-def root():
-    return {"service": "CompliancePulse API", "version": "0.1.0", "status": "running"}
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Verify API token"""
+    if not API_TOKEN:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="API token not configured"
+        )
+    if credentials.credentials != API_TOKEN:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token"
+        )
+    return credentials.credentials
 
 @app.get("/health")
-def health():
-    try:
-        with Session(engine) as s:
-            s.exec(select(System).limit(1))
-        return {"status": "healthy", "database": "connected"}
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Database error: {str(e)}")
-
-@app.get("/systems")
-def get_systems():
-    with Session(engine) as s:
-        systems = s.exec(select(System)).all()
-        return {"systems": systems, "count": len(systems)}
-
-@app.get("/systems/{system_id}")
-def get_system(system_id: int):
-    with Session(engine) as s:
-        system = s.get(System, system_id)
-        if not system:
-            raise HTTPException(status_code=404, detail="System not found")
-        return system
-
-@app.post("/scan", response_model=ScanResponse)
-def scan_system(request: ScanRequest):
-    scan_result = {
-        "hostname": request.hostname,
-        "score": 87,
-        "issues": [
-            "Password policy does not meet CIS standards",
-            "Firewall not configured properly",
-            "SSH root login enabled",
-            "No automatic security updates configured"
-        ],
-        "scan_time": datetime.now().isoformat()
+def health_check():
+    """Health check endpoint (no auth required)"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": "0.3.0"
     }
-    
-    with Session(engine) as s:
-        existing = s.exec(select(System).where(System.hostname == request.hostname)).first()
-        
-        if existing:
-            system = existing
-            system.last_scan = scan_result["scan_time"]
-        else:
-            system = System(
-                hostname=request.hostname,
-                ip=request.ip,
-                last_scan=scan_result["scan_time"]
-            )
-            s.add(system)
-        
-        s.commit()
-        s.refresh(system)
-        
-        import json
-        report = Report(
-            system_id=system.id,
-            score=scan_result["score"],
-            issues_json=json.dumps(scan_result["issues"]),
-            created_at=scan_result["scan_time"]
-        )
-        s.add(report)
-        s.commit()
-    
-    return scan_result
 
-@app.get("/reports")
-def get_reports(limit: int = 10):
-    with Session(engine) as s:
-        reports = s.exec(select(Report).limit(limit)).all()
+@app.get("/api/report")
+def get_report(token: str = Depends(verify_token)):
+    """Get latest compliance report"""
+    report_path = DATA_DIR / "compliance_report.json"
+    
+    if not report_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No compliance report available yet. Run a scan first."
+        )
+    
+    try:
+        with open(report_path) as f:
+            data = json.load(f)
+        return data
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Report file is corrupted"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to read report: {str(e)}"
+        )
+
+@app.get("/api/reports/history")
+def get_report_history(token: str = Depends(verify_token), limit: int = 10):
+    """Get historical compliance reports"""
+    try:
+        reports = []
+        for report_file in sorted(DATA_DIR.glob("compliance_report_*.json"), reverse=True)[:limit]:
+            with open(report_file) as f:
+                data = json.load(f)
+                reports.append({
+                    "filename": report_file.name,
+                    "timestamp": data.get("metadata", {}).get("timestamp"),
+                    "summary": data.get("summary", {})
+                })
         return {"reports": reports, "count": len(reports)}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve history: {str(e)}"
+        )

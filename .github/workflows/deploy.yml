@@ -1,0 +1,39 @@
+name: Deploy CompliancePulse
+
+on:
+  push:
+    branches:
+      - phase0.2-deployment
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Deploy to VPS
+        run: |
+          ssh -o StrictHostKeyChecking=no sly@107.175.73.38 << 'EOF'
+            cd /opt/compliancepulse
+            echo "Pulling latest changes..."
+            git fetch origin
+            git reset --hard origin/phase0.2-deployment
+
+            echo "Restarting Docker stack..."
+            sudo docker compose down
+            sudo docker compose up -d
+
+            echo "Restarting backend service..."
+            sudo systemctl restart compliancepulse-api
+
+            echo "Deployment complete ✅"
+          EOF
+

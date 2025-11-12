@@ -7,6 +7,9 @@ CONFIG_DIR="$(dirname "$0")/../config"
 BASE_DIR="$(dirname "$0")/.."
 LOGS_DIR="$BASE_DIR/logs"
 
+export BASE_DIR
+export LOGS_DIR
+
 mkdir -p "$LOGS_DIR"
 LOG_FILE="$LOGS_DIR/scan.log"
 

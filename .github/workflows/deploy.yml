@@ -23,9 +23,10 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no sly@107.175.73.38 << 'EOF'
             cd /opt/compliancepulse
+            BRANCH="${{ github.ref_name }}"
             echo "Pulling latest changes..."
             git fetch origin
-            git reset --hard origin/phase0.2-deployment
+            git reset --hard "origin/$BRANCH"
 
             echo "Restarting Docker stack..."
             sudo docker compose down

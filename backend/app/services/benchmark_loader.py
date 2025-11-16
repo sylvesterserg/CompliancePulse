@@ -77,6 +77,8 @@ class PulseBenchmarkLoader:
     def _replace_rules(self, session: Session, document: BenchmarkDocument) -> None:
         session.exec(delete(Rule).where(Rule.benchmark_id == document.benchmark.id))
         for rule in document.rules:
+            tags = rule.metadata.get("tags", []) if isinstance(rule.metadata, dict) else []
+            status = rule.metadata.get("status", "active") if isinstance(rule.metadata, dict) else "active"
             session.add(
                 Rule(
                     id=rule.id,
@@ -87,11 +89,13 @@ class PulseBenchmarkLoader:
                     remediation=rule.remediation,
                     references_json=json.dumps(rule.references),
                     metadata_json=json.dumps(rule.metadata),
+                    tags_json=json.dumps(tags),
                     check_type=rule.check.type,
                     command=rule.check.command,
                     expect_type=rule.check.expect.type,
                     expect_value=str(rule.check.expect.value),
                     timeout_seconds=rule.check.timeout,
+                    status=status,
                 )
             )
 

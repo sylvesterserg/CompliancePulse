@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ app_name }} · {{ page_title or "Console" }}</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', path='css/app.css') }}"
+    />
+    <script src="{{ url_for('static', path='js/htmx.js') }}" defer></script>
+    {% block head %}{% endblock %}
+  </head>
+  <body class="bg-slate-100 text-slate-900">
+    <div class="flex min-h-screen">
+      <aside class="w-64 bg-slate-900 text-slate-100 shadow-xl">
+        <div class="px-6 py-6 border-b border-slate-800">
+          <h1 class="text-xl font-semibold tracking-tight">CompliancePulse</h1>
+          <p class="text-sm text-slate-400">Real-time compliance insights</p>
+        </div>
+        <nav class="mt-4 space-y-1 px-4">
+          {% set nav_items = [
+            {"label": "Dashboard", "href": "/", "id": "dashboard", "icon": "home"},
+            {"label": "Rules", "href": "/rules", "id": "rules", "icon": "document"},
+            {"label": "Scans", "href": "/scans", "id": "scans", "icon": "bolt"},
+            {"label": "Reports", "href": "/reports", "id": "reports", "icon": "chart"},
+          ] %}
+          {% for item in nav_items %}
+          <a
+            href="{{ item.href }}"
+            class="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors {% if nav_active == item.id %}bg-slate-800 text-white{% else %}text-slate-300 hover:bg-slate-800 hover:text-white{% endif %}"
+          >
+            <span class="inline-flex h-6 w-6 items-center justify-center rounded-md bg-slate-800/60 text-xs uppercase">
+              {{ item.icon[0] }}
+            </span>
+            {{ item.label }}
+          </a>
+          {% endfor %}
+        </nav>
+      </aside>
+      <main class="flex-1">
+        <header class="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-5 shadow-sm">
+          <div>
+            <p class="text-xs uppercase tracking-wide text-slate-400">Environment</p>
+            <p class="text-lg font-semibold text-slate-900">{{ environment|capitalize }}</p>
+          </div>
+          <div class="text-right">
+            <p class="text-xs uppercase tracking-wide text-slate-400">Health</p>
+            <p class="text-lg font-semibold {% if health_status.status == 'healthy' %}text-emerald-600{% else %}text-amber-600{% endif %}">
+              {{ health_status.status|title }}
+            </p>
+            <p class="text-xs text-slate-500">DB: {{ health_status.database }}</p>
+          </div>
+        </header>
+        <section class="px-8 py-8">
+          {% block content %}{% endblock %}
+        </section>
+      </main>
+    </div>
+    <div id="modal-root"></div>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

@@ -39,11 +39,15 @@ def _build_detail(session: Session, benchmark: Benchmark) -> BenchmarkDetail:
 
 
 def _rule_to_summary(rule: Rule) -> RuleSummary:
+    tags = json.loads(rule.tags_json or "[]")
     return RuleSummary(
         id=rule.id,
         benchmark_id=rule.benchmark_id,
         title=rule.title,
         severity=rule.severity,
+        status=rule.status,
+        tags=tags,
+        last_run=rule.last_run,
     )
 
 

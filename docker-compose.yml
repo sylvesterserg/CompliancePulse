@@ -1,14 +1,21 @@
+version: "3.9"
+
 services:
-  backend:
-    build: ./backend
-    container_name: compliancepulse-backend
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: compliancepulse-api
     ports:
       - "8000:8000"
+    environment:
+      - DB_URL=sqlite:////app/data/compliancepulse.db
+      - ENVIRONMENT=development
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
-    environment:
-      - DB_URL=sqlite:////app/data/compliancepulse.db
+      - ./frontend/templates:/app/frontend/templates
+      - ./frontend/static:/app/frontend/static
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -17,12 +24,11 @@ services:
       retries: 3
       start_period: 10s
 
-  frontend:
-    build: ./frontend
-    container_name: compliancepulse-frontend
-    ports:
-      - "3000:3000"
-    depends_on:
-      backend:
-        condition: service_healthy
-    restart: unless-stopped
+  tailwind:
+    image: node:20-alpine
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    command: ["sh", "-c", "npm install && npm run build:css"]
+    profiles: ["assets"]
+    restart: "no"

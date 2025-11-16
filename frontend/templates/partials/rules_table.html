@@ -1,0 +1,29 @@
+<tbody id="rules-table" class="divide-y divide-slate-100">
+  {% for rule in rules %}
+  <tr class="hover:bg-slate-50">
+    <td class="px-4 py-3">
+      <p class="text-sm font-semibold text-slate-900">{{ rule.title }}</p>
+      <p class="text-xs text-slate-500">{{ rule.id }} · {{ rule.benchmark_id }}</p>
+    </td>
+    <td class="px-4 py-3">
+      <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">{{ rule.severity|title }}</span>
+    </td>
+    <td class="px-4 py-3">
+      <div class="flex flex-wrap gap-1 text-xs text-slate-500">
+        {% for tag in rule.tags %}
+        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{{ tag }}</span>
+        {% endfor %}
+      </div>
+    </td>
+    <td class="px-4 py-3 text-sm text-slate-600">{{ rule.status|title }}</td>
+    <td class="px-4 py-3 text-right text-xs text-slate-500">{{ rule.last_run.strftime('%b %d %H:%M') if rule.last_run else 'Never' }}</td>
+  </tr>
+  {% else %}
+  <tr>
+    <td colspan="5" class="px-4 py-6 text-center text-sm text-slate-500">No rules found.</td>
+  </tr>
+  {% endfor %}
+</tbody>
+{% if modal_reset is defined and modal_reset %}
+<div id="modal-root" hx-swap-oob="innerHTML"></div>
+{% endif %}

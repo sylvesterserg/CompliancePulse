@@ -1,18 +1,30 @@
-FROM python:3.11-slim
+FROM node:20-alpine AS assets
+WORKDIR /build
+COPY package.json ./
+COPY tailwind.config.js ./
+COPY frontend ./frontend
+RUN npm install && npm run build:css
 
+FROM python:3.11-slim AS runtime
 WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY backend/app ./app
+COPY backend/main.py ./main.py
+COPY backend/benchmarks ./benchmarks
+COPY frontend/templates ./frontend/templates
+COPY --from=assets /build/frontend/static ./frontend/static
 
-RUN mkdir -p /app/data /app/logs
+RUN mkdir -p /app/data /app/logs /app/artifacts
 
 EXPOSE 8000
 

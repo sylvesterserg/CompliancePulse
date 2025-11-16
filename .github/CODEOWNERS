@@ -1,0 +1,7 @@
+# Default reviewers
+*       @CompliancePulse/maintainers
+
+# Service-specific ownership
+backend/    @CompliancePulse/backend-team
+frontend/   @CompliancePulse/frontend-team
+agent/      @CompliancePulse/agent-team

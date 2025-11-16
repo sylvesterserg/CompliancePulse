@@ -1,10 +1,23 @@
+# Bytecode and caches
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
 venv/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Local data + logs persisted via docker compose
+/data/
+/logs/
+
+# Tooling artifacts
 .env
-node_modules/
-.next/
-*.log
-*.db
-data/
-logs/
+.env.local
+coverage/
+pytest_cache/
+

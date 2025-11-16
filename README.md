@@ -1,69 +1,71 @@
 # CompliancePulse
 
-Security compliance monitoring and scanning platform for Linux systems.
+Security compliance monitoring and scanning platform for Linux systems. The repository is intentionally split into service-specific folders so you always know where a change belongs.
 
-## Quick Start
+## Repository Layout
+
+| Path | Purpose |
+| --- | --- |
+| `agent/` | Standalone Python scanner CLI ([docs](agent/README.md)) |
+| `backend/` | FastAPI + SQLModel API ([docs](backend/README.md)) |
+| `frontend/` | Static dashboard served over HTTP ([docs](frontend/README.md)) |
+| `docker-compose.yml` | Source of truth for how services are orchestrated |
+| `compliancepulse_install_v2.sh` | Convenience installer for bare-metal hosts |
+
+## Quick Start (Docker Compose)
 
 ```bash
-# Start services
-docker compose up -d
+# Build + start services
+docker compose up -d --build
 
-# View logs
+# Follow logs
 docker compose logs -f
 
-# Stop services
+# Stop everything
 docker compose down
 ```
 
-## Access Points
+### Access Points
+- **Frontend Dashboard** http://localhost:3000
+- **Backend API** http://localhost:8000
+- **API Docs** http://localhost:8000/docs
 
-- **Frontend Dashboard**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs
-
-## Development
+## Development Commands
 
 ```bash
-# Rebuild after code changes
-docker compose up -d --build
+# Syntax check Python services
+make lint
 
-# Run agent locally
-cd agent
-python3 scan_agent.py <hostname> [ip]
+# Validate docker-compose configuration
+make test
 
-# View backend logs
-docker compose logs -f backend
-
-# Check service health
-curl http://localhost:8000/health
+# Run services individually
+make backend
+make frontend
+make agent
 ```
 
-## Architecture
+The `Makefile` gives contributors one entry point for routine tasks. Extend it as you add formal linting/testing.
 
-- **Backend**: FastAPI + SQLModel (Python 3.11)
-- **Frontend**: Static HTML + Vanilla JS
-- **Database**: SQLite (persistent volume)
-- **Agent**: Python scanning script
+## Architecture Snapshot
 
-## Data Persistence
+- **Backend**: FastAPI + SQLModel (Python 3.11) with SQLite storage mounted from `./data`.
+- **Frontend**: Static HTML + Vanilla JS fetching backend endpoints.
+- **Agent**: Python CLI that simulates scan output for now.
+- **Orchestration**: Docker Compose with health checks and persistent volumes.
 
-- Database: `./data/compliancepulse.db`
-- Logs: `./logs/`
+## Data Persistence & Housekeeping
 
-## Phase 0.1 Features
-
-✓ FastAPI backend with health checks  
-✓ Interactive web dashboard  
-✓ Mock scanning agent  
-✓ Data persistence with volumes  
-✓ CORS support  
-✓ System and report tracking  
+- Database lives at `./data/compliancepulse.db` (ignored via `.gitignore`).
+- Logs emitted by containers live in `./logs/` (also ignored).
+- Update `.gitignore` whenever you add new local-only artifacts.
 
 ## Roadmap
 
-**Phase 1**: Real SSH-based scanning, authentication, PostgreSQL  
-**Phase 2**: Enhanced dashboard, real-time updates, reporting  
-**Phase 3**: Multi-node scanning, compliance frameworks, alerting  
+- **Phase 0.1**: ✅ FastAPI backend, mock agent, dashboard, persistence, health checks.
+- **Phase 1**: Real SSH-based scanning, authentication, PostgreSQL.
+- **Phase 2**: Enhanced dashboard, real-time updates, reporting.
+- **Phase 3**: Multi-node scanning, compliance frameworks, alerting.
 
 ## Troubleshooting
 
@@ -79,11 +81,6 @@ docker compose restart
 
 # Clean rebuild
 docker compose down && docker compose up -d --build
-
-# Check firewall
-sudo firewall-cmd --list-ports
 ```
 
-## Support
-
-For issues or questions, check `/var/log/compliancepulse-install.log`
+For bare-metal installs, inspect `/var/log/compliancepulse-install.log` from `compliancepulse_install_v2.sh`.

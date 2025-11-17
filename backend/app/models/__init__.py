@@ -1,4 +1,6 @@
 from .domain import (
+    ApiKey,
+    AuditLog,
     Benchmark,
     Report,
     Rule,
@@ -10,6 +12,8 @@ from .domain import (
 )
 
 __all__ = [
+    "ApiKey",
+    "AuditLog",
     "Benchmark",
     "Report",
     "Rule",

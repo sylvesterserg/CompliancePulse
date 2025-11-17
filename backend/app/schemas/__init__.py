@@ -15,8 +15,12 @@ from .scan import (
     ScanSummary,
 )
 from .schedule import RuleGroupView, ScheduleCreate, ScheduleView
+from .security import ApiKeyCreateRequest, ApiKeyCreateResponse, ApiKeyView
 
 __all__ = [
+    "ApiKeyCreateRequest",
+    "ApiKeyCreateResponse",
+    "ApiKeyView",
     "BenchmarkDetail",
     "BenchmarkDocument",
     "BenchmarkSummary",

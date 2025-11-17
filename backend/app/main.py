@@ -1,20 +1,27 @@
 from __future__ import annotations
 
+import logging
+import time
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 
-from .api import benchmarks, reports, rules, scans, schedules, ui_router
+from .api import benchmarks, reports, rules, scans, schedules, security, ui_router
 from .config import settings
 from .database import engine, init_db
 from .models import Benchmark
+from .security.config import security_settings
+from .security.utils import get_client_context
 from .services.benchmark_loader import PulseBenchmarkLoader
 from .seed import seed_dev_data
 
 app = FastAPI(title=settings.app_name, version=settings.version, description="Compliance scanning service for Rocky Linux")
+
+logger = logging.getLogger("compliancepulse.api")
+logger.setLevel(security_settings.log_level)
 
 for static_path in (settings.frontend_template_dir, settings.frontend_static_dir):
     Path(static_path).mkdir(parents=True, exist_ok=True)
@@ -34,7 +41,29 @@ app.include_router(rules.router)
 app.include_router(scans.router)
 app.include_router(reports.router)
 app.include_router(schedules.router)
+app.include_router(security.router)
 app.include_router(ui_router.router)
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.time()
+    response = None
+    try:
+        response = await call_next(request)
+        return response
+    finally:
+        duration_ms = int((time.time() - start) * 1000)
+        ip, _ = get_client_context(request)
+        status_code = response.status_code if response else 500
+        logger.info(
+            "%s %s -> %s (%sms) ip=%s",
+            request.method,
+            request.url.path,
+            status_code,
+            duration_ms,
+            ip or "unknown",
+        )
 
 
 @app.on_event("startup")

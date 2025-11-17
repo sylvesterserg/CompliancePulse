@@ -60,7 +60,8 @@ def _process_job() -> bool:
         job = _claim_job(session)
         if not job:
             return False
-        executor = ScanExecutor(session)
+        session.info["organization_id"] = job.organization_id
+        executor = ScanExecutor(session, organization_id=job.organization_id)
         try:
             result = executor.execute_job(job)
             job.status = "completed"

@@ -25,8 +25,9 @@ class ScanExecutionResult:
 
 
 class ScanExecutor:
-    def __init__(self, session: Session, rule_engine: RuleEngine | None = None):
+    def __init__(self, session: Session, organization_id: int, rule_engine: RuleEngine | None = None):
         self.session = session
+        self.organization_id = organization_id
         self.rule_engine = rule_engine or RuleEngine()
         for path in (settings.logs_dir, settings.artifacts_dir):
             Path(path).mkdir(parents=True, exist_ok=True)
@@ -47,6 +48,7 @@ class ScanExecutor:
             tags = sorted(set(tags) | set(extra_tags))
         severity = self._derive_severity(rules)
         scan = Scan(
+            organization_id=self.organization_id,
             hostname=hostname,
             ip=ip,
             benchmark_id=benchmark_id,
@@ -92,6 +94,7 @@ class ScanExecutor:
         self.session.add(scan)
 
         report = Report(
+            organization_id=self.organization_id,
             scan_id=scan.id,
             benchmark_id=scan.benchmark_id,
             hostname=scan.hostname,
@@ -128,6 +131,8 @@ class ScanExecutor:
         group = self.session.get(RuleGroup, group_id)
         if not group:
             raise ValueError("Rule group not found")
+        if group.organization_id != self.organization_id:
+            raise ValueError("Unauthorized access to group")
         rule_ids = self._group_rule_ids(group)
         if rule_ids:
             rules = self.session.exec(select(Rule).where(Rule.id.in_(rule_ids))).all()
@@ -144,6 +149,8 @@ class ScanExecutor:
         )
 
     def execute_job(self, job: ScanJob) -> ScanExecutionResult:
+        if job.organization_id != self.organization_id:
+            raise ValueError("Job organization mismatch")
         return self.run_for_group(
             group_id=job.group_id,
             hostname=job.hostname,
@@ -173,6 +180,7 @@ class ScanExecutor:
 
     def _persist_result(self, scan: Scan, rule: Rule, evaluation: RuleEvaluation) -> ScanResult:
         result = ScanResult(
+            organization_id=self.organization_id,
             scan_id=scan.id,
             rule_id=rule.id,
             rule_title=rule.title,

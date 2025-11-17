@@ -1,12 +1,12 @@
 import pytest
 from sqlmodel import Session
 
-from app.models import Benchmark, Rule
+from app.models import Benchmark, Organization, Rule
 from app.schemas import ScanRequest
 from app.services.scan_service import ScanService
 
 
-def _seed_benchmark(session: Session) -> Benchmark:
+def _seed_benchmark(session: Session, organization_id: int) -> Benchmark:
     benchmark = Benchmark(
         id="rocky-test",
         title="Rocky Test Benchmark",
@@ -21,6 +21,7 @@ def _seed_benchmark(session: Session) -> Benchmark:
     rules = [
         Rule(
             id="rule-pass",
+            organization_id=organization_id,
             benchmark_id=benchmark.id,
             title="Pass rule",
             description="",
@@ -34,6 +35,7 @@ def _seed_benchmark(session: Session) -> Benchmark:
         ),
         Rule(
             id="rule-fail",
+            organization_id=organization_id,
             benchmark_id=benchmark.id,
             title="Fail rule",
             description="",
@@ -53,8 +55,11 @@ def _seed_benchmark(session: Session) -> Benchmark:
 
 
 def test_start_scan_persists_results_and_reports(session: Session) -> None:
-    benchmark = _seed_benchmark(session)
-    service = ScanService(session)
+    org = Organization(name="QA Org", slug="qa-org")
+    session.add(org)
+    session.commit()
+    benchmark = _seed_benchmark(session, org.id)
+    service = ScanService(session, organization_id=org.id)
 
     detail = service.start_scan(
         ScanRequest(hostname="web-01", ip="10.0.0.5", benchmark_id=benchmark.id)
@@ -78,8 +83,11 @@ def test_start_scan_persists_results_and_reports(session: Session) -> None:
 
 
 def test_list_and_get_scan_views(session: Session) -> None:
-    benchmark = _seed_benchmark(session)
-    service = ScanService(session)
+    org = Organization(name="QA Org 2", slug="qa-org-2")
+    session.add(org)
+    session.commit()
+    benchmark = _seed_benchmark(session, org.id)
+    service = ScanService(session, organization_id=org.id)
 
     created = service.start_scan(ScanRequest(hostname="db-01", benchmark_id=benchmark.id))
 
@@ -94,7 +102,10 @@ def test_list_and_get_scan_views(session: Session) -> None:
 
 
 def test_start_scan_requires_existing_benchmark(session: Session) -> None:
-    service = ScanService(session)
+    org = Organization(name="Empty Org", slug="empty-org")
+    session.add(org)
+    session.commit()
+    service = ScanService(session, organization_id=org.id)
 
     with pytest.raises(ValueError):
         service.start_scan(ScanRequest(hostname="missing", benchmark_id="unknown"))

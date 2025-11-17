@@ -11,6 +11,7 @@ from app.services.rule_engine import RuleExecutionEngine
 def _build_rule(**overrides):
     base = {
         "id": "rule-test",
+        "organization_id": 1,
         "benchmark_id": "benchmark",
         "title": "Test rule",
         "description": "",

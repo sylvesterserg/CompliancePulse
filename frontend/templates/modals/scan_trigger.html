@@ -11,6 +11,7 @@
       hx-target="#scans-table"
       hx-swap="outerHTML"
     >
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
       <label class="text-sm font-medium text-slate-600">
         Hostname
         <input name="hostname" class="mt-1 w-full rounded-lg border-slate-200" required />

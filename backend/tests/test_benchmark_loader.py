@@ -8,8 +8,8 @@ import textwrap
 import pytest
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from backend.app.models import Benchmark, Rule
-from backend.app.services.benchmark_loader import PulseBenchmarkLoader
+from app.models import Benchmark, Organization, Rule
+from app.services.benchmark_loader import PulseBenchmarkLoader
 
 
 def _bootstrap_memory_session() -> Session:
@@ -59,7 +59,10 @@ def test_loader_persists_benchmark_and_rules(tmp_path: Path) -> None:
 
     loader = PulseBenchmarkLoader(directory=tmp_path)
     with _bootstrap_memory_session() as session:
-        benchmarks = loader.load_all(session)
+        org = Organization(name="Test Org", slug="test-org")
+        session.add(org)
+        session.commit()
+        benchmarks = loader.load_all(session, organization_id=org.id)
         assert len(benchmarks) == 1
 
         benchmark = session.get(Benchmark, "rocky-linux-level1")
@@ -67,7 +70,7 @@ def test_loader_persists_benchmark_and_rules(tmp_path: Path) -> None:
         assert benchmark.title == "Rocky Linux Level 1"
         assert benchmark.schema_version == "0.3"
 
-        rules = session.exec(select(Rule)).all()
+        rules = session.exec(select(Rule).where(Rule.organization_id == org.id)).all()
         assert len(rules) == 1
         assert rules[0].command == "echo pass"
         assert rules[0].expect_type == "equals"

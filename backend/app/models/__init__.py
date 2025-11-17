@@ -1,6 +1,8 @@
 from .domain import (
+    ApiKey,
+    AuditLog,
     Benchmark,
-    BillingEvent,
+    MembershipRole,
     Organization,
     Report,
     Rule,
@@ -9,11 +11,15 @@ from .domain import (
     ScanJob,
     ScanResult,
     Schedule,
+    User,
+    UserOrganization,
 )
 
 __all__ = [
+    "ApiKey",
+    "AuditLog",
     "Benchmark",
-    "BillingEvent",
+    "MembershipRole",
     "Organization",
     "Report",
     "Rule",
@@ -22,4 +28,6 @@ __all__ = [
     "ScanJob",
     "ScanResult",
     "Schedule",
+    "User",
+    "UserOrganization",
 ]

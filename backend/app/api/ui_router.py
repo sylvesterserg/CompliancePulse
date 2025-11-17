@@ -1,27 +1,33 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
+from starlette.responses import Response
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, func, select
 
-from ..billing.dependencies import (
-    count_rules,
-    count_schedules,
-    get_current_organization,
-    require_active_subscription,
-    require_feature,
-)
-from ..billing.plans import get_plan
+from ..auth.dependencies import verify_csrf_token
 from ..config import settings
-from ..models import Benchmark, Organization, Report, Rule, RuleGroup, Scan, ScanJob, Schedule
+from ..database import get_session
+from ..models import (
+    Benchmark,
+    MembershipRole,
+    Organization,
+    Report,
+    Rule,
+    RuleGroup,
+    Scan,
+    ScanJob,
+    Schedule,
+    User,
+    UserOrganization,
+)
 from ..schemas import ScanRequest, ScheduleCreate
 from ..services.scan_service import ScanService
 from ..services.schedule_service import ScheduleService
-from .deps import get_db_session
 
 router = APIRouter()
 
@@ -36,18 +42,77 @@ def _templates() -> Jinja2Templates:
     return _templates_instance
 
 
+def _health_status(session: Session) -> Dict[str, str]:
+    try:
+        session.exec(select(func.count(Rule.id)).limit(1))
+        return {"status": "healthy", "database": "connected"}
+    except Exception:  # pragma: no cover - defensive
+        return {"status": "degraded", "database": "unreachable"}
+
+
+def _resolve_ui_context(
+    request: Request, session: Session
+) -> Optional[Tuple[User, Organization, List[Organization], UserOrganization]]:
+    session_data = getattr(request.state, "session_data", None)
+    if not session_data or not session_data.user_id:
+        return None
+    user = session.get(User, session_data.user_id)
+    if not user or not user.is_active:
+        return None
+    memberships = session.exec(
+        select(UserOrganization).where(UserOrganization.user_id == user.id)
+    ).all()
+    if not memberships:
+        return None
+    current_org_id = session_data.organization_id or memberships[0].organization_id
+    organization = session.get(Organization, current_org_id)
+    if not organization:
+        organization = session.get(Organization, memberships[0].organization_id)
+        if not organization:
+            return None
+        current_org_id = organization.id
+    session_data.organization_id = current_org_id
+    request.state.session_data = session_data
+    request.state.session_dirty = True
+    session.info["organization_id"] = organization.id
+    membership = next(
+        (m for m in memberships if m.organization_id == organization.id), memberships[0]
+    )
+    organizations: List[Organization] = []
+    for member in memberships:
+        org = session.get(Organization, member.organization_id)
+        if org:
+            organizations.append(org)
+    request.state.current_user = user
+    request.state.current_organization = organization
+    request.state.current_membership = membership
+    return user, organization, organizations, membership
+
+
+def _redirect_to_login() -> RedirectResponse:
+    return RedirectResponse("/auth/login", status_code=303)
+
+
 def _base_context(
     request: Request,
     session: Session,
     active: str,
-    organization: Organization | None = None,
+    user: User,
+    organization: Organization,
+    organizations: List[Organization],
+    membership: UserOrganization,
 ) -> Dict[str, Any]:
-    context = {
+    return {
         "request": request,
         "environment": settings.environment,
         "nav_active": active,
         "health_status": _health_status(session),
         "page_title": active.title(),
+        "current_user": user,
+        "current_organization": organization,
+        "organizations": organizations,
+        "membership": membership,
+        "csrf_token": _csrf_token(request),
     }
     if organization:
         try:
@@ -65,12 +130,9 @@ def _base_context(
     return context
 
 
-def _health_status(session: Session) -> Dict[str, str]:
-    try:
-        session.exec(select(func.count(Rule.id)).limit(1))
-        return {"status": "healthy", "database": "connected"}
-    except Exception:  # pragma: no cover - defensive
-        return {"status": "degraded", "database": "unreachable"}
+def _csrf_token(request: Request) -> str:
+    session_data = getattr(request.state, "session_data", None)
+    return session_data.csrf_token if session_data else ""
 
 
 def _serialize_rule(rule: Rule) -> Dict[str, Any]:
@@ -129,11 +191,20 @@ def _rule_groups(session: Session) -> List[Dict[str, Any]]:
 
 
 def _render_rules_table(request: Request, session: Session, modal_reset: bool = False) -> HTMLResponse:
-    context = {"request": request, "rules": _rule_list(session), "modal_reset": modal_reset}
+    context = {
+        "request": request,
+        "rules": _rule_list(session),
+        "modal_reset": modal_reset,
+        "csrf_token": _csrf_token(request),
+    }
     return _templates().TemplateResponse("partials/rules_table.html", context)
 
 
-def _render_scans_table(request: Request, scan_service: ScanService, modal_reset: bool = False) -> HTMLResponse:
+def _render_scans_table(
+    request: Request,
+    scan_service: ScanService,
+    modal_reset: bool = False,
+) -> HTMLResponse:
     context = {
         "request": request,
         "scans": scan_service.list_scans(),
@@ -151,6 +222,7 @@ def _render_rule_groups_panel(
         "request": request,
         "rule_groups": _rule_groups(session),
         "message": message,
+        "csrf_token": _csrf_token(request),
     }
     return _templates().TemplateResponse("partials/rule_groups.html", context)
 
@@ -164,6 +236,7 @@ def _render_schedules_table(
         "request": request,
         "schedules": schedule_service.list_schedules(),
         "modal_reset": modal_reset,
+        "csrf_token": _csrf_token(request),
     }
     return _templates().TemplateResponse("partials/schedules_table.html", context)
 
@@ -176,14 +249,23 @@ def _render_reports_table(request: Request, scan_service: ScanService) -> HTMLRe
     return _templates().TemplateResponse("partials/reports_table.html", context)
 
 
-@router.get("/dashboard", response_class=HTMLResponse)
+def _ensure_admin(membership: UserOrganization) -> None:
+    allowed = {MembershipRole.ADMIN, MembershipRole.OWNER}
+    if membership.role not in allowed:
+        raise HTTPException(status_code=403, detail="Administrator role required")
+
+
+@router.get("/", response_class=HTMLResponse)
 async def dashboard(
     request: Request,
-    session: Session = Depends(get_db_session),
-    organization: Organization = Depends(get_current_organization),
-) -> HTMLResponse:
-    scan_service = ScanService(session, organization=organization)
-    schedule_service = ScheduleService(session)
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
+    scan_service = ScanService(session, organization.id)
+    schedule_service = ScheduleService(session, organization.id)
     scans = scan_service.list_scans()
     reports = scan_service.list_reports()
     failed_scans = [scan for scan in scans if scan.result == "failed"][:5]
@@ -191,7 +273,7 @@ async def dashboard(
     if reports:
         compliance_score = round(sum(report.score for report in reports) / len(reports), 2)
     context = {
-        **_base_context(request, session, "dashboard", organization),
+        **_base_context(request, session, "dashboard", user, organization, organizations, membership),
         "rules_count": session.exec(select(func.count(Rule.id))).one(),
         "scans_count": session.exec(select(func.count(Scan.id))).one(),
         "last_failed_scans": failed_scans,
@@ -207,11 +289,14 @@ async def dashboard(
 @router.get("/rules", response_class=HTMLResponse)
 async def rules_page(
     request: Request,
-    session: Session = Depends(get_db_session),
-    organization: Organization = Depends(get_current_organization),
-) -> HTMLResponse:
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
     context = {
-        **_base_context(request, session, "rules", organization),
+        **_base_context(request, session, "rules", user, organization, organizations, membership),
         "rules": _rule_list(session),
         "modal_reset": False,
     }
@@ -221,12 +306,15 @@ async def rules_page(
 @router.get("/scans", response_class=HTMLResponse)
 async def scans_page(
     request: Request,
-    session: Session = Depends(get_db_session),
-    organization: Organization = Depends(get_current_organization),
-) -> HTMLResponse:
-    scan_service = ScanService(session, organization=organization)
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
+    scan_service = ScanService(session, organization.id)
     context = {
-        **_base_context(request, session, "scans", organization),
+        **_base_context(request, session, "scans", user, organization, organizations, membership),
         "scans": scan_service.list_scans(),
     }
     return _templates().TemplateResponse("scans.html", context)
@@ -235,12 +323,15 @@ async def scans_page(
 @router.get("/reports", response_class=HTMLResponse)
 async def reports_page(
     request: Request,
-    session: Session = Depends(get_db_session),
-    organization: Organization = Depends(get_current_organization),
-) -> HTMLResponse:
-    scan_service = ScanService(session, organization=organization)
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
+    scan_service = ScanService(session, organization.id)
     context = {
-        **_base_context(request, session, "reports", organization),
+        **_base_context(request, session, "reports", user, organization, organizations, membership),
         "reports": scan_service.list_reports(),
     }
     return _templates().TemplateResponse("reports.html", context)
@@ -249,18 +340,35 @@ async def reports_page(
 @router.get("/rules/modal/new", response_class=HTMLResponse)
 async def rule_modal(
     request: Request,
-    session: Session = Depends(get_db_session),
-) -> HTMLResponse:
-    context = {"request": request, "benchmarks": _benchmarks(session)}
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
+    _ensure_admin(membership)
+    context = {
+        "request": request,
+        "benchmarks": _benchmarks(session),
+        "csrf_token": _csrf_token(request),
+    }
     return _templates().TemplateResponse("modals/rule_new.html", context)
 
 
-@router.post("/rules/create", response_class=HTMLResponse)
+@router.post(
+    "/rules/create",
+    response_class=HTMLResponse,
+    dependencies=[Depends(verify_csrf_token)],
+)
 async def create_rule(
     request: Request,
-    session: Session = Depends(get_db_session),
-    _: Organization = Depends(require_feature("rules", count_rules)),
-) -> HTMLResponse:
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
+    _ensure_admin(membership)
     form = await request.form()
     rule_id = str(form.get("rule_id", "")).strip()
     benchmark_id = str(form.get("benchmark_id", "")).strip()
@@ -282,6 +390,7 @@ async def create_rule(
     tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
     rule = Rule(
         id=rule_id,
+        organization_id=organization.id,
         benchmark_id=benchmark_id,
         title=title,
         description=description or "",
@@ -305,18 +414,35 @@ async def create_rule(
 @router.get("/scans/modal/trigger", response_class=HTMLResponse)
 async def scan_modal(
     request: Request,
-    session: Session = Depends(get_db_session),
-) -> HTMLResponse:
-    context = {"request": request, "benchmarks": _benchmarks(session)}
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
+    _ensure_admin(membership)
+    context = {
+        "request": request,
+        "benchmarks": _benchmarks(session),
+        "csrf_token": _csrf_token(request),
+    }
     return _templates().TemplateResponse("modals/scan_trigger.html", context)
 
 
-@router.post("/scans/trigger", response_class=HTMLResponse)
+@router.post(
+    "/scans/trigger",
+    response_class=HTMLResponse,
+    dependencies=[Depends(verify_csrf_token)],
+)
 async def trigger_scan(
     request: Request,
-    session: Session = Depends(get_db_session),
-    organization: Organization = Depends(require_active_subscription),
-) -> HTMLResponse:
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
+    _ensure_admin(membership)
     form = await request.form()
     hostname = str(form.get("hostname", "")).strip()
     ip = str(form.get("ip", "")).strip()
@@ -324,7 +450,7 @@ async def trigger_scan(
     tags = str(form.get("tags", ""))
     if not hostname or not benchmark_id:
         raise HTTPException(status_code=400, detail="Missing required fields")
-    scan_service = ScanService(session, organization=organization)
+    scan_service = ScanService(session, organization.id)
     tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
     payload = ScanRequest(hostname=hostname, ip=ip or None, benchmark_id=benchmark_id, tags=tag_list)
     scan_service.start_scan(payload)
@@ -334,24 +460,36 @@ async def trigger_scan(
 @router.get("/automation/modal/schedule", response_class=HTMLResponse)
 async def schedule_modal(
     request: Request,
-    session: Session = Depends(get_db_session),
-    organization: Organization = Depends(get_current_organization),
-) -> HTMLResponse:
-    schedule_service = ScheduleService(session)
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
+    _ensure_admin(membership)
+    schedule_service = ScheduleService(session, organization.id)
     context = {
         "request": request,
         "rule_groups": schedule_service.list_rule_groups(),
-        "organization": organization,
+        "csrf_token": _csrf_token(request),
     }
     return _templates().TemplateResponse("modals/schedule_new.html", context)
 
 
-@router.post("/automation/schedules", response_class=HTMLResponse)
+@router.post(
+    "/automation/schedules",
+    response_class=HTMLResponse,
+    dependencies=[Depends(verify_csrf_token)],
+)
 async def create_schedule_from_modal(
     request: Request,
-    session: Session = Depends(get_db_session),
-    _: Organization = Depends(require_feature("schedules", count_schedules)),
-) -> HTMLResponse:
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
+    _ensure_admin(membership)
     form = await request.form()
     name = str(form.get("name", "")).strip()
     group_id = int(form.get("group_id", 0))
@@ -360,7 +498,7 @@ async def create_schedule_from_modal(
     interval_minutes = int(interval) if interval else None
     if not name or not group_id:
         raise HTTPException(status_code=400, detail="Name and group are required")
-    schedule_service = ScheduleService(session)
+    schedule_service = ScheduleService(session, organization.id)
     payload = ScheduleCreate(
         name=name,
         group_id=group_id,
@@ -375,14 +513,22 @@ async def create_schedule_from_modal(
     return _render_schedules_table(request, schedule_service, modal_reset=True)
 
 
-@router.delete("/automation/schedules/{schedule_id}", response_class=HTMLResponse)
+@router.delete(
+    "/automation/schedules/{schedule_id}",
+    response_class=HTMLResponse,
+    dependencies=[Depends(verify_csrf_token)],
+)
 async def delete_schedule_from_dashboard(
     schedule_id: int,
     request: Request,
-    session: Session = Depends(get_db_session),
-    _: Organization = Depends(require_active_subscription),
-) -> HTMLResponse:
-    schedule_service = ScheduleService(session)
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
+    _ensure_admin(membership)
+    schedule_service = ScheduleService(session, organization.id)
     try:
         schedule_service.delete_schedule(schedule_id)
     except ValueError as exc:
@@ -390,14 +536,22 @@ async def delete_schedule_from_dashboard(
     return _render_schedules_table(request, schedule_service)
 
 
-@router.post("/automation/groups/{group_id}/run", response_class=HTMLResponse)
+@router.post(
+    "/automation/groups/{group_id}/run",
+    response_class=HTMLResponse,
+    dependencies=[Depends(verify_csrf_token)],
+)
 async def run_group_now(
     group_id: int,
     request: Request,
-    session: Session = Depends(get_db_session),
-    _: Organization = Depends(require_active_subscription),
-) -> HTMLResponse:
-    scan_service = ScanService(session)
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
+    _ensure_admin(membership)
+    scan_service = ScanService(session, organization.id)
     try:
         job = scan_service.enqueue_group_scan(group_id, triggered_by="ui")
     except ValueError as exc:
@@ -411,9 +565,13 @@ async def run_group_now(
 async def report_modal(
     report_id: int,
     request: Request,
-    session: Session = Depends(get_db_session),
-) -> HTMLResponse:
-    scan_service = ScanService(session)
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
+    scan_service = ScanService(session, organization.id)
     try:
         report = scan_service.get_report(report_id)
     except ValueError as exc:

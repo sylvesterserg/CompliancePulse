@@ -1,9 +1,41 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import List, Optional
 
+from sqlalchemy import Column, Text
 from sqlmodel import Field, SQLModel
+
+
+class MembershipRole(str, Enum):
+    OWNER = "OWNER"
+    ADMIN = "ADMIN"
+    MEMBER = "MEMBER"
+
+
+class Organization(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    slug: str = Field(index=True, sa_column_kwargs={"unique": True})
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class User(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(index=True, sa_column_kwargs={"unique": True})
+    hashed_password: str
+    is_active: bool = Field(default=True)
+    is_verified: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class UserOrganization(SQLModel, table=True):
+    user_id: int = Field(foreign_key="user.id", primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", primary_key=True)
+    role: MembershipRole = Field(default=MembershipRole.MEMBER)
+    joined_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class Benchmark(SQLModel, table=True):
@@ -22,6 +54,7 @@ class Benchmark(SQLModel, table=True):
 
 class Rule(SQLModel, table=True):
     id: str = Field(primary_key=True, index=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     benchmark_id: str = Field(foreign_key="benchmark.id", index=True)
     title: str
     description: str
@@ -42,6 +75,7 @@ class Rule(SQLModel, table=True):
 
 class RuleGroup(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     name: str
     benchmark_id: str = Field(foreign_key="benchmark.id", index=True)
     description: Optional[str] = None
@@ -56,6 +90,7 @@ class RuleGroup(SQLModel, table=True):
 
 class Scan(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     hostname: str
     ip: Optional[str] = None
     benchmark_id: str = Field(foreign_key="benchmark.id")
@@ -77,6 +112,7 @@ class Scan(SQLModel, table=True):
 
 class ScanResult(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     scan_id: int = Field(foreign_key="scan.id", index=True)
     rule_id: str = Field(foreign_key="rule.id")
     rule_title: str
@@ -93,6 +129,7 @@ class ScanResult(SQLModel, table=True):
 
 class Report(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     scan_id: int = Field(foreign_key="scan.id")
     benchmark_id: str = Field(foreign_key="benchmark.id")
     hostname: str
@@ -110,6 +147,7 @@ class Report(SQLModel, table=True):
 
 class Schedule(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     name: str
     group_id: int = Field(foreign_key="rulegroup.id")
     frequency: str = Field(default="daily")
@@ -124,6 +162,7 @@ class Schedule(SQLModel, table=True):
 
 class ScanJob(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     group_id: int = Field(foreign_key="rulegroup.id")
     schedule_id: Optional[int] = Field(default=None, foreign_key="schedule.id")
     hostname: str
@@ -136,64 +175,32 @@ class ScanJob(SQLModel, table=True):
     scan_id: Optional[int] = Field(default=None, foreign_key="scan.id")
 
 
-def _default_trial_end() -> datetime:
-    return datetime.utcnow() + timedelta(days=14)
-
-
-class Organization(SQLModel, table=True):
+class AuditLog(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    timestamp: datetime = Field(default_factory=datetime.utcnow, index=True)
+    user_id: Optional[str] = Field(default=None, index=True)
+    organization_id: Optional[str] = Field(default=None, index=True)
+    action_type: str = Field(index=True)
+    resource_type: Optional[str] = Field(default=None, index=True)
+    resource_id: Optional[str] = Field(default=None)
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    metadata_json: str = Field(default="{}", sa_column=Column(Text))
+
+
+class ApiKey(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: Optional[str] = Field(default=None, index=True)
     name: str
-    slug: str = Field(index=True, sa_column_kwargs={"unique": True})
-    billing_email: Optional[str] = None
-    stripe_customer_id: Optional[str] = Field(default=None, index=True)
-    stripe_subscription_id: Optional[str] = Field(default=None, index=True)
-    current_plan: str = Field(default="free")
-    plan_status: str = Field(default="trialing")
-    trial_end: datetime = Field(default_factory=_default_trial_end)
-    next_billing_date: Optional[datetime] = None
+    hashed_key: str = Field(sa_column=Column(Text, nullable=False))
+    prefix: str = Field(index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    last_used_at: Optional[datetime] = None
+    is_active: bool = Field(default=True, index=True)
+    scopes_json: str = Field(default="", sa_column=Column(Text))
 
-    def is_trial_active(self) -> bool:
-        return bool(self.trial_end and self.trial_end > datetime.utcnow())
-
-    def days_remaining_in_trial(self) -> int:
-        if not self.trial_end:
-            return 0
-        remaining = (self.trial_end - datetime.utcnow()).days
-        return max(remaining, 0)
-
-    def is_subscription_active(self) -> bool:
-        if self.is_trial_active():
-            return True
-        return self.plan_status in {"active", "trialing"}
-
-    def mark_plan_status(
-        self,
-        *,
-        plan_name: str | None = None,
-        status: str | None = None,
-        trial_end: datetime | None = None,
-        next_billing_date: datetime | None = None,
-        subscription_id: str | None = None,
-        customer_id: str | None = None,
-    ) -> None:
-        if plan_name:
-            self.current_plan = plan_name
-        if status:
-            self.plan_status = status
-        if trial_end:
-            self.trial_end = trial_end
-        if next_billing_date:
-            self.next_billing_date = next_billing_date
-        if subscription_id is not None:
-            self.stripe_subscription_id = subscription_id
-        if customer_id is not None:
-            self.stripe_customer_id = customer_id
-        self.updated_at = datetime.utcnow()
-
-
-class BillingEvent(SQLModel, table=True):
-    id: str = Field(primary_key=True)
-    type: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    @property
+    def scopes(self) -> List[str]:
+        if not self.scopes_json:
+            return []
+        return [scope for scope in self.scopes_json.split(",") if scope]

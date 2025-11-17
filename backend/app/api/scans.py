@@ -2,65 +2,102 @@ from __future__ import annotations
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import Session
 
-from ..billing.dependencies import get_current_organization, require_active_subscription
-from ..models import Organization
+from ..auth.dependencies import get_current_organization, require_role
+from ..models import MembershipRole
 from ..schemas import ReportView, ScanDetail, ScanJobView, ScanRequest, ScanSummary
+from ..security.api_keys import get_optional_api_key
+from ..security.audit import log_action
+from ..security.rate_limit import rate_limit
+from ..security.utils import mask_secret
 from ..services.scan_service import ScanService
 from .deps import get_db_session
 
 router = APIRouter(prefix="/scans", tags=["scans"])
 
 
-def _get_service(session: Session, organization: Organization | None = None) -> ScanService:
-    return ScanService(session, organization=organization)
+def _get_service(
+    session: Session = Depends(get_db_session),
+    organization = Depends(get_current_organization),
+) -> ScanService:
+    return ScanService(session, organization_id=organization.id)
 
 
-@router.post("", response_model=ScanDetail)
+@router.post(
+    "",
+    response_model=ScanDetail,
+    dependencies=[Depends(rate_limit("scan:create", 20, 60))],
+)
 def create_scan(
     payload: ScanRequest,
     session: Session = Depends(get_db_session),
-    organization: Organization = Depends(require_active_subscription),
+    request: Request | None = None,
+    api_key=Depends(get_optional_api_key),
 ) -> ScanDetail:
     try:
-        return _get_service(session, organization=organization).start_scan(payload)
+        detail = _get_service(session).start_scan(payload)
+        log_action(
+            action_type="SCAN_TRIGGER",
+            resource_type="SCAN",
+            resource_id=detail.id,
+            request=request,
+            user=None,
+            org=None,
+            metadata={
+                "benchmark_id": payload.benchmark_id,
+                "hostname": payload.hostname,
+                "api_key": mask_secret(api_key.prefix) if api_key else None,
+            },
+        )
+        return detail
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.get("", response_model=List[ScanSummary])
-def list_scans(session: Session = Depends(get_db_session)) -> List[ScanSummary]:
-    organization = get_current_organization(session)
-    return _get_service(session, organization=organization).list_scans()
+def list_scans(service: ScanService = Depends(_get_service)) -> List[ScanSummary]:
+    return service.list_scans()
 
 
 @router.get("/{scan_id}", response_model=ScanDetail)
-def get_scan(scan_id: int, session: Session = Depends(get_db_session)) -> ScanDetail:
+def get_scan(scan_id: int, service: ScanService = Depends(_get_service)) -> ScanDetail:
     try:
-        organization = get_current_organization(session)
-        return _get_service(session, organization=organization).get_scan(scan_id)
+        return service.get_scan(scan_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.get("/{scan_id}/report", response_model=ReportView)
-def get_scan_report(scan_id: int, session: Session = Depends(get_db_session)) -> ReportView:
+def get_scan_report(scan_id: int, service: ScanService = Depends(_get_service)) -> ReportView:
     try:
-        organization = get_current_organization(session)
-        return _get_service(session, organization=organization).get_report_for_scan(scan_id)
+        return service.get_report_for_scan(scan_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/trigger/group/{group_id}", response_model=ScanJobView)
+@router.post(
+    "/trigger/group/{group_id}",
+    response_model=ScanJobView,
+    dependencies=[Depends(rate_limit("scan:trigger-group", 10, 60))],
+)
 def trigger_group_scan(
     group_id: int,
     session: Session = Depends(get_db_session),
-    organization: Organization = Depends(require_active_subscription),
+    request: Request | None = None,
 ) -> ScanJobView:
     try:
-        return _get_service(session, organization=organization).enqueue_group_scan(group_id)
+        job = _get_service(session).enqueue_group_scan(group_id)
+        log_action(
+            action_type="SCAN_TRIGGER_GROUP",
+            resource_type="RULE_GROUP",
+            resource_id=group_id,
+            request=request,
+            user=None,
+            org=None,
+            metadata={"job_id": job.id},
+        )
+        return job
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

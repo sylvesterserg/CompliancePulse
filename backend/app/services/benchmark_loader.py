@@ -33,12 +33,13 @@ class PulseBenchmarkLoader:
         self._validate_document(document)
         return document
 
-    def load_all(self, session: Session) -> List[Benchmark]:
+    def load_all(self, session: Session, organization_id: int) -> List[Benchmark]:
         """Load all benchmark files into the database."""
         benchmarks: List[Benchmark] = []
         for path in self.discover():
             document = self.parse(path)
             benchmark = self._upsert_benchmark(session, document)
+            self._replace_rules(session, document, organization_id)
             benchmarks.append(benchmark)
         session.commit()
         return benchmarks
@@ -71,17 +72,22 @@ class PulseBenchmarkLoader:
             benchmark.tags_json = tags_json
             benchmark.schema_version = document.schema_version
             benchmark.updated_at = datetime.utcnow()
-        self._replace_rules(session, document)
         return benchmark
 
-    def _replace_rules(self, session: Session, document: BenchmarkDocument) -> None:
-        session.exec(delete(Rule).where(Rule.benchmark_id == document.benchmark.id))
+    def _replace_rules(self, session: Session, document: BenchmarkDocument, organization_id: int) -> None:
+        session.exec(
+            delete(Rule).where(
+                (Rule.benchmark_id == document.benchmark.id)
+                & (Rule.organization_id == organization_id)
+            )
+        )
         for rule in document.rules:
             tags = rule.metadata.get("tags", []) if isinstance(rule.metadata, dict) else []
             status = rule.metadata.get("status", "active") if isinstance(rule.metadata, dict) else "active"
             session.add(
                 Rule(
                     id=rule.id,
+                    organization_id=organization_id,
                     benchmark_id=document.benchmark.id,
                     title=rule.title,
                     description=rule.description,

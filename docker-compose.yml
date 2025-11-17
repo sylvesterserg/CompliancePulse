@@ -12,19 +12,24 @@ services:
     environment:
       - DB_URL=sqlite:////app/data/compliancepulse.db
       - ENVIRONMENT=development
-      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8000}
-      - STRIPE_PUBLIC_KEY=${STRIPE_PUBLIC_KEY:-}
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
-      - STRIPE_PRICE_FREE=${STRIPE_PRICE_FREE:-price_free}
-      - STRIPE_PRICE_PRO=${STRIPE_PRICE_PRO:-price_pro}
-      - STRIPE_PRICE_ENTERPRISE=${STRIPE_PRICE_ENTERPRISE:-price_enterprise}
-      - BILLING_OWNER_TOKEN=${BILLING_OWNER_TOKEN:-}
+      - SESSION_SECRET_KEY=dev-session-key
+      - API_KEY_HASH_SALT=dev-api-salt
+      - STRIPE_WEBHOOK_SECRET=demo-stripe
+      - ALLOWED_COMMANDS=cat,grep,rpm,dpkg,stat,systemctl,test
+      - MAX_SCAN_RUNTIME_PER_JOB=900
+      - MAX_CONCURRENT_JOBS_PER_ORG=3
+      - API_KEY_RATE_LIMIT=1000
+      - API_KEY_RATE_WINDOW_SECONDS=3600
+      - AUDIT_LOG_RETENTION_DAYS=180
+      - SECURITY_TEST_MODE=0
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./frontend/templates:/app/frontend/templates
       - ./frontend/static:/app/frontend/static
+    depends_on:
+      redis:
+        condition: service_started
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -49,14 +54,16 @@ services:
     environment:
       - DB_URL=sqlite:////app/data/compliancepulse.db
       - ENVIRONMENT=development
-      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8000}
-      - STRIPE_PUBLIC_KEY=${STRIPE_PUBLIC_KEY:-}
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
-      - STRIPE_PRICE_FREE=${STRIPE_PRICE_FREE:-price_free}
-      - STRIPE_PRICE_PRO=${STRIPE_PRICE_PRO:-price_pro}
-      - STRIPE_PRICE_ENTERPRISE=${STRIPE_PRICE_ENTERPRISE:-price_enterprise}
-      - BILLING_OWNER_TOKEN=${BILLING_OWNER_TOKEN:-}
+      - SESSION_SECRET_KEY=dev-session-key
+      - API_KEY_HASH_SALT=dev-api-salt
+      - STRIPE_WEBHOOK_SECRET=demo-stripe
+      - ALLOWED_COMMANDS=cat,grep,rpm,dpkg,stat,systemctl,test
+      - MAX_SCAN_RUNTIME_PER_JOB=900
+      - MAX_CONCURRENT_JOBS_PER_ORG=3
+      - API_KEY_RATE_LIMIT=1000
+      - API_KEY_RATE_WINDOW_SECONDS=3600
+      - AUDIT_LOG_RETENTION_DAYS=180
+      - SECURITY_TEST_MODE=0
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -74,14 +81,16 @@ services:
     environment:
       - DB_URL=sqlite:////app/data/compliancepulse.db
       - ENVIRONMENT=development
-      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8000}
-      - STRIPE_PUBLIC_KEY=${STRIPE_PUBLIC_KEY:-}
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
-      - STRIPE_PRICE_FREE=${STRIPE_PRICE_FREE:-price_free}
-      - STRIPE_PRICE_PRO=${STRIPE_PRICE_PRO:-price_pro}
-      - STRIPE_PRICE_ENTERPRISE=${STRIPE_PRICE_ENTERPRISE:-price_enterprise}
-      - BILLING_OWNER_TOKEN=${BILLING_OWNER_TOKEN:-}
+      - SESSION_SECRET_KEY=dev-session-key
+      - API_KEY_HASH_SALT=dev-api-salt
+      - STRIPE_WEBHOOK_SECRET=demo-stripe
+      - ALLOWED_COMMANDS=cat,grep,rpm,dpkg,stat,systemctl,test
+      - MAX_SCAN_RUNTIME_PER_JOB=900
+      - MAX_CONCURRENT_JOBS_PER_ORG=3
+      - API_KEY_RATE_LIMIT=1000
+      - API_KEY_RATE_WINDOW_SECONDS=3600
+      - AUDIT_LOG_RETENTION_DAYS=180
+      - SECURITY_TEST_MODE=0
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -101,12 +110,11 @@ services:
     profiles: ["assets"]
     restart: "no"
 
-  frontend:
-    image: nginx:1.25-alpine
-    container_name: compliancepulse-frontend
-    volumes:
-      - ./frontend/static:/usr/share/nginx/html:ro
-    profiles: ["assets"]
+  redis:
+    image: redis:7-alpine
+    container_name: compliancepulse-redis
     ports:
-      - "8080:80"
+      - "6379:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    profiles: ["rate-limit"]
     restart: unless-stopped

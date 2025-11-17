@@ -11,6 +11,9 @@ docker compose --profile assets run --rm tailwind
 # Start services
 docker compose up -d --build
 
+# Optional: launch Redis-backed rate limiting in the future
+docker compose --profile rate-limit up -d redis
+
 # View logs
 docker compose logs -f api
 
@@ -66,6 +69,43 @@ curl http://localhost:8000/health
 - **Frontend**: FastAPI templates + HTMX-lite interactions
 - **Database**: SQLite (persistent volume)
 - **Agent**: Python scanning script
+- **Security Controls**: Audit logging + rate limiting + API keys (Phase 0.9)
+
+## Security + Observability Controls
+
+- Centralized `AuditLog` table captures auth, scan, scheduler, and API key events.
+- Request-level logging middleware with IP + latency traces.
+- Built-in rate limiting primitives (default in-memory, Redis-ready).
+- Organization-scoped API keys with prefix-based storage and secure hashing.
+- Worker/scheduler guardrails for sandboxed rule execution and runtime capping.
+- Configurable allowed command whitelist (`ALLOWED_COMMANDS`) for the rule engine.
+
+### Security Environment Variables
+
+Set the following (already defined with dev-safe defaults in `docker-compose.yml`):
+
+| Variable | Purpose |
+| --- | --- |
+| `SESSION_SECRET_KEY` | Session / CSRF signing key. |
+| `API_KEY_HASH_SALT` | Salt for API key hashing. |
+| `STRIPE_WEBHOOK_SECRET` | Secret for Stripe webhook validation. |
+| `ALLOWED_COMMANDS` | Comma-separated whitelist for rule engine commands. |
+| `MAX_SCAN_RUNTIME_PER_JOB` | Seconds before sandboxed scans are force-failed. |
+| `MAX_CONCURRENT_JOBS_PER_ORG` | Concurrency guardrail for the worker/scheduler. |
+| `API_KEY_RATE_LIMIT` / `API_KEY_RATE_WINDOW_SECONDS` | API key usage caps. |
+| `AUDIT_LOG_RETENTION_DAYS` | Controls downstream log retention policies. |
+| `SECURITY_TEST_MODE` | Enables in-memory stores for test harnesses. |
+
+### API Keys
+
+Manage programmatic access via:
+
+- `GET /settings/api-keys` – list keys.
+- `POST /settings/api-keys/create` – issue a new key (plaintext returned once).
+- `GET /settings/api-keys/{id}/show` – inspect metadata for a key.
+- `POST /settings/api-keys/{id}/revoke` – deactivate a key.
+
+Keys authenticate via `Authorization: Bearer <token>` or `X-API-Key`.
 
 ## Data Persistence
 

@@ -40,7 +40,7 @@
         </nav>
       </aside>
       <main class="flex-1">
-        <header class="flex items-center justify-between border-b border-slate-200 bg-white px-8 py-5 shadow-sm">
+        <header class="flex flex-wrap items-center justify-between gap-6 border-b border-slate-200 bg-white px-8 py-5 shadow-sm">
           <div>
             <p class="text-xs uppercase tracking-wide text-slate-400">Environment</p>
             <p class="text-lg font-semibold text-slate-900">{{ environment|capitalize }}</p>
@@ -51,6 +51,26 @@
               {{ health_status.status|title }}
             </p>
             <p class="text-xs text-slate-500">DB: {{ health_status.database }}</p>
+          </div>
+          <div class="text-right">
+            <p class="text-xs uppercase tracking-wide text-slate-400">Organization</p>
+            <p class="text-lg font-semibold text-slate-900">{{ current_organization.name }}</p>
+            <div class="text-xs text-slate-500">
+              {% for org in organizations %}
+              {% if org.id != current_organization.id %}
+              <a href="/org/switch/{{ org.id }}" class="underline hover:text-indigo-600">Switch to {{ org.name }}</a>
+              {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+          <div class="text-right">
+            <p class="text-xs uppercase tracking-wide text-slate-400">Account</p>
+            <p class="text-sm font-semibold text-slate-900">{{ current_user.email }}</p>
+            <div class="text-xs text-slate-500 flex flex-wrap justify-end gap-2">
+              <a href="/org/create" class="hover:text-indigo-600">New Org</a>
+              <span>·</span>
+              <a href="/auth/logout" class="hover:text-rose-600">Logout</a>
+            </div>
           </div>
         </header>
         <section class="px-8 py-8">

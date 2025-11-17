@@ -6,7 +6,15 @@ from .benchmark import (
     RuleDetail,
     RuleSummary,
 )
-from .scan import ReportView, RuleResultView, ScanDetail, ScanRequest, ScanSummary
+from .scan import (
+    ReportView,
+    ScanDetail,
+    ScanJobView,
+    ScanRequest,
+    ScanResultView,
+    ScanSummary,
+)
+from .schedule import RuleGroupView, ScheduleCreate, ScheduleView
 
 __all__ = [
     "BenchmarkDetail",
@@ -15,9 +23,13 @@ __all__ = [
     "ReportView",
     "RuleDefinition",
     "RuleDetail",
+    "RuleGroupView",
     "RuleResultView",
+    "ScanJobView",
     "RuleSummary",
     "ScanDetail",
     "ScanRequest",
     "ScanSummary",
+    "ScheduleCreate",
+    "ScheduleView",
 ]

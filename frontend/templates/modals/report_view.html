@@ -22,6 +22,26 @@
       </div>
     </div>
     <p class="mt-4 text-sm text-slate-600">{{ report.summary }}</p>
+    {% if report.key_findings %}
+    <div class="mt-4">
+      <p class="text-xs uppercase tracking-wide text-slate-500">Key Findings</p>
+      <ul class="mt-2 space-y-1 text-sm text-slate-700">
+        {% for item in report.key_findings %}
+        <li>• {{ item }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    {% if report.remediations %}
+    <div class="mt-4">
+      <p class="text-xs uppercase tracking-wide text-slate-500">Recommended Actions</p>
+      <ul class="mt-2 space-y-1 text-sm text-slate-700">
+        {% for item in report.remediations %}
+        <li>• {{ item }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
     <div class="mt-4">
       <p class="text-xs uppercase tracking-wide text-slate-500">Tags</p>
       <div class="mt-2 flex flex-wrap gap-2">

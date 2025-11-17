@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from sqlmodel import Session, select
 
 from .config import settings
-from .models import Benchmark, Report, Rule, Scan
+from .models import Benchmark, Report, Rule, RuleGroup, Scan, Schedule
 
 
 def seed_dev_data(session: Session) -> None:
@@ -63,7 +63,9 @@ def seed_dev_data(session: Session) -> None:
         },
     ]
 
+    rule_ids = []
     for payload in rules:
+        rule_ids.append(payload["id"])
         session.add(
             Rule(
                 id=payload["id"],
@@ -85,10 +87,37 @@ def seed_dev_data(session: Session) -> None:
         )
     session.commit()
 
+    group = RuleGroup(
+        name="Baseline Controls",
+        benchmark_id=benchmark.id,
+        description="All seeded development rules",
+        rule_ids_json=json.dumps(rule_ids),
+        default_hostname="web-01",
+        tags_json=json.dumps(["baseline", "seed"]),
+    )
+    session.add(group)
+    session.commit()
+
+    schedule = Schedule(
+        name="Daily Baseline",
+        group_id=group.id,
+        frequency="daily",
+        interval_minutes=1440,
+        next_run=datetime.utcnow() + timedelta(days=1),
+    )
+    session.add(schedule)
+    session.commit()
+
     now = datetime.utcnow()
+    ai_payload_success = {
+        "summary": "All baseline controls passed",
+        "key_findings": ["All seeded rules succeeded"],
+        "remediations": ["Continue monitoring daily"],
+    }
     scan_success = Scan(
         hostname="web-01",
         benchmark_id=benchmark.id,
+        group_id=group.id,
         status="passed",
         severity="medium",
         tags_json=json.dumps(["ssh", "baseline"]),
@@ -98,10 +127,20 @@ def seed_dev_data(session: Session) -> None:
         total_rules=3,
         passed_rules=3,
         output_path="/tmp/scan-success.json",
+        summary=ai_payload_success["summary"],
+        ai_summary_json=json.dumps(ai_payload_success),
+        triggered_by="seed",
+        compliance_score=100.0,
     )
+    ai_payload_failed = {
+        "summary": "Two controls failed",
+        "key_findings": ["pkg-001 failed", "svc-004 failed"],
+        "remediations": ["Install missing packages", "Enable auditd"],
+    }
     scan_failed = Scan(
         hostname="db-01",
         benchmark_id=benchmark.id,
+        group_id=group.id,
         status="failed",
         severity="high",
         tags_json=json.dumps(["audit", "policy"]),
@@ -111,6 +150,10 @@ def seed_dev_data(session: Session) -> None:
         total_rules=3,
         passed_rules=1,
         output_path="/tmp/scan-failed.json",
+        summary=ai_payload_failed["summary"],
+        ai_summary_json=json.dumps(ai_payload_failed),
+        triggered_by="seed",
+        compliance_score=33.3,
     )
     session.add(scan_success)
     session.add(scan_failed)
@@ -121,24 +164,28 @@ def seed_dev_data(session: Session) -> None:
         benchmark_id=benchmark.id,
         hostname=scan_success.hostname,
         score=100.0,
-        summary="All rules passed in the last execution.",
+        summary=ai_payload_success["summary"],
         status="passed",
         severity="medium",
         tags_json=scan_success.tags_json,
         output_path="/tmp/report-success.json",
         last_run=scan_success.last_run,
+        key_findings_json=json.dumps(ai_payload_success["key_findings"]),
+        remediations_json=json.dumps(ai_payload_success["remediations"]),
     )
     report_failed = Report(
         scan_id=scan_failed.id,
         benchmark_id=benchmark.id,
         hostname=scan_failed.hostname,
         score=33.3,
-        summary="Two controls failed.",
+        summary=ai_payload_failed["summary"],
         status="attention",
         severity="high",
         tags_json=scan_failed.tags_json,
         output_path="/tmp/report-failed.json",
         last_run=scan_failed.last_run,
+        key_findings_json=json.dumps(ai_payload_failed["key_findings"]),
+        remediations_json=json.dumps(ai_payload_failed["remediations"]),
     )
     session.add(report_success)
     session.add(report_failed)

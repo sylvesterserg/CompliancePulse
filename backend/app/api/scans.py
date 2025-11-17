@@ -5,7 +5,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 
-from ..schemas import ReportView, ScanDetail, ScanRequest, ScanSummary
+from ..schemas import ReportView, ScanDetail, ScanJobView, ScanRequest, ScanSummary
 from ..services.scan_service import ScanService
 from .deps import get_db_session
 
@@ -44,5 +44,16 @@ def get_scan(scan_id: int, session: Session = Depends(get_db_session)) -> ScanDe
 def get_scan_report(scan_id: int, session: Session = Depends(get_db_session)) -> ReportView:
     try:
         return _get_service(session).get_report_for_scan(scan_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/trigger/group/{group_id}", response_model=ScanJobView)
+def trigger_group_scan(
+    group_id: int,
+    session: Session = Depends(get_db_session),
+) -> ScanJobView:
+    try:
+        return _get_service(session).enqueue_group_scan(group_id)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 
-from .api import benchmarks, reports, rules, scans, ui_router
+from .api import benchmarks, reports, rules, scans, schedules, ui_router
 from .config import settings
 from .database import engine, init_db
 from .models import Benchmark
@@ -33,6 +33,7 @@ app.include_router(benchmarks.router)
 app.include_router(rules.router)
 app.include_router(scans.router)
 app.include_router(reports.router)
+app.include_router(schedules.router)
 app.include_router(ui_router.router)
 
 

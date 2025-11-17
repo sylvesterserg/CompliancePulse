@@ -19,7 +19,10 @@ COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/app ./app
+COPY backend/engine ./engine
 COPY backend/main.py ./main.py
+COPY backend/worker.py ./worker.py
+COPY backend/scheduler_service.py ./scheduler_service.py
 COPY backend/benchmarks ./benchmarks
 COPY frontend/templates ./frontend/templates
 COPY --from=assets /build/frontend/static ./frontend/static

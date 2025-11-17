@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import List, Optional
 
+from sqlalchemy import Column, Text
 from sqlmodel import Field, SQLModel
 
 
@@ -134,3 +135,34 @@ class ScanJob(SQLModel, table=True):
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     scan_id: Optional[int] = Field(default=None, foreign_key="scan.id")
+
+
+class AuditLog(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    timestamp: datetime = Field(default_factory=datetime.utcnow, index=True)
+    user_id: Optional[str] = Field(default=None, index=True)
+    organization_id: Optional[str] = Field(default=None, index=True)
+    action_type: str = Field(index=True)
+    resource_type: Optional[str] = Field(default=None, index=True)
+    resource_id: Optional[str] = Field(default=None)
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    metadata_json: str = Field(default="{}", sa_column=Column(Text))
+
+
+class ApiKey(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: Optional[str] = Field(default=None, index=True)
+    name: str
+    hashed_key: str = Field(sa_column=Column(Text, nullable=False))
+    prefix: str = Field(index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_used_at: Optional[datetime] = None
+    is_active: bool = Field(default=True, index=True)
+    scopes_json: str = Field(default="", sa_column=Column(Text))
+
+    @property
+    def scopes(self) -> List[str]:
+        if not self.scopes_json:
+            return []
+        return [scope for scope in self.scopes_json.split(",") if scope]

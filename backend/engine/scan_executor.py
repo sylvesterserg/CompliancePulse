@@ -41,7 +41,7 @@ class ScanExecutor:
         triggered_by: str = "manual",
         group: RuleGroup | None = None,
         extra_tags: Sequence[str] | None = None,
-        allow_ai_summary: bool = True,
+        organization_id: int | None = None,
     ) -> ScanExecutionResult:
         rules = list(rules)
         tags = self._collect_rule_tags(rules)
@@ -54,6 +54,7 @@ class ScanExecutor:
             ip=ip,
             benchmark_id=benchmark_id,
             group_id=group.id if group else None,
+            organization_id=organization_id,
             status="running",
             severity=severity,
             tags_json=json.dumps(tags),
@@ -105,6 +106,7 @@ class ScanExecutor:
             organization_id=self.organization_id,
             scan_id=scan.id,
             benchmark_id=scan.benchmark_id,
+            organization_id=scan.organization_id,
             hostname=scan.hostname,
             score=score,
             summary=summary_bundle.get("summary", ""),
@@ -155,7 +157,7 @@ class ScanExecutor:
             triggered_by=triggered_by,
             group=group,
             extra_tags=json.loads(group.tags_json or "[]"),
-            allow_ai_summary=allow_ai_summary,
+            organization_id=group.organization_id,
         )
 
     def execute_job(self, job: ScanJob) -> ScanExecutionResult:

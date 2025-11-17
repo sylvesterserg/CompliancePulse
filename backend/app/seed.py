@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta
 
+from secrets import token_urlsafe
+
 from sqlmodel import Session, select
 
 from .auth.utils import hash_password
@@ -106,6 +108,7 @@ def seed_dev_data(session: Session) -> None:
         hostname="web-01",
         benchmark_id=benchmark.id,
         group_id=group.id,
+        organization_id=organization_id,
         status="passed",
         severity="medium",
         tags_json=json.dumps(["ssh", "baseline"]),
@@ -130,6 +133,7 @@ def seed_dev_data(session: Session) -> None:
         hostname="db-01",
         benchmark_id=benchmark.id,
         group_id=group.id,
+        organization_id=organization_id,
         status="failed",
         severity="high",
         tags_json=json.dumps(["audit", "policy"]),
@@ -152,6 +156,7 @@ def seed_dev_data(session: Session) -> None:
         organization_id=organization.id,
         scan_id=scan_success.id,
         benchmark_id=benchmark.id,
+        organization_id=organizations[0].id if organizations else None,
         hostname=scan_success.hostname,
         score=100.0,
         summary=ai_payload_success["summary"],
@@ -167,6 +172,7 @@ def seed_dev_data(session: Session) -> None:
         organization_id=organization.id,
         scan_id=scan_failed.id,
         benchmark_id=benchmark.id,
+        organization_id=organizations[0].id if organizations else None,
         hostname=scan_failed.hostname,
         score=33.3,
         summary=ai_payload_failed["summary"],
@@ -181,3 +187,123 @@ def seed_dev_data(session: Session) -> None:
     session.add(report_success)
     session.add(report_failed)
     session.commit()
+
+
+def _seed_platform_entities(session: Session) -> None:
+    organizations = session.exec(select(Organization)).all()
+    if not organizations:
+        now = datetime.utcnow()
+        org_payloads = [
+            {
+                "name": "CompliancePulse Cloud",
+                "slug": "compliancepulse-cloud",
+                "plan_tier": "enterprise",
+                "seat_limit": 25,
+                "subscription_status": "active",
+                "subscription_renews_at": now + timedelta(days=30),
+                "stripe_customer_id": "cus_dev_cloud",
+                "stripe_subscription_id": "sub_dev_cloud",
+            },
+            {
+                "name": "Acme Industries",
+                "slug": "acme-industries",
+                "plan_tier": "team",
+                "seat_limit": 10,
+                "subscription_status": "trialing",
+                "subscription_renews_at": now + timedelta(days=14),
+                "stripe_customer_id": "cus_acme",
+                "stripe_subscription_id": "sub_acme",
+            },
+        ]
+        for payload in org_payloads:
+            session.add(Organization(**payload))
+        session.commit()
+        organizations = session.exec(select(Organization)).all()
+
+    users = session.exec(select(User)).all()
+    if not users:
+        users_to_create = [
+            {
+                "email": "superadmin@compliancepulse.io",
+                "full_name": "Super Admin",
+                "hashed_password": "dev-super-admin",
+                "super_admin": True,
+            },
+            {
+                "email": "ops@acme.io",
+                "full_name": "Operations Admin",
+                "hashed_password": "dev-admin",
+            },
+            {
+                "email": "analyst@acme.io",
+                "full_name": "Security Analyst",
+                "hashed_password": "dev-analyst",
+            },
+        ]
+        for payload in users_to_create:
+            session.add(User(**payload))
+        session.commit()
+        users = session.exec(select(User)).all()
+
+    if organizations and users:
+        has_members = session.exec(select(OrganizationMembership).limit(1)).first()
+        if not has_members:
+            for user in users:
+                role = "OWNER" if user.super_admin else "MEMBER"
+                session.add(
+                    OrganizationMembership(
+                        organization_id=organizations[0].id,
+                        user_id=user.id,
+                        role=role,
+                    )
+                )
+            if len(organizations) > 1 and len(users) > 1:
+                session.add(
+                    OrganizationMembership(
+                        organization_id=organizations[1].id,
+                        user_id=users[1].id,
+                        role="ADMIN",
+                    )
+                )
+            session.commit()
+
+    if organizations:
+        has_flags = session.exec(select(FeatureFlag).limit(1)).first()
+        if not has_flags:
+            session.add_all(
+                [
+                    FeatureFlag(key="ai_summaries", description="Enable AI powered report summaries", enabled=True),
+                    FeatureFlag(key="governance_mode", description="Require approvals before scans", enabled=False),
+                    FeatureFlag(key="fisma_controls", description="Expose beta FISMA mappings", enabled=False),
+                ]
+            )
+            session.commit()
+
+    if organizations:
+        has_logs = session.exec(select(PlatformLog).limit(1)).first()
+        if not has_logs:
+            session.add_all(
+                [
+                    PlatformLog(level="info", source="scheduler", message="Daily scan schedule executed", details_json=json.dumps({"organization": organizations[0].slug})),
+                    PlatformLog(level="warning", source="worker", message="Worker queue depth exceeded threshold", details_json=json.dumps({"pending_jobs": 7})),
+                    PlatformLog(level="info", source="billing", message="Stripe webhook processed", details_json=json.dumps({"customer": organizations[0].stripe_customer_id})),
+                ]
+            )
+            session.commit()
+
+    has_workers = session.exec(select(WorkerStatus).limit(1)).first()
+    if not has_workers:
+        session.add_all(
+            [
+                WorkerStatus(worker_type="scheduler", status="running", queue_depth=0),
+                WorkerStatus(worker_type="scan-worker", status="idle", queue_depth=1),
+            ]
+        )
+        session.commit()
+
+    super_admin = session.exec(select(User).where(User.super_admin == True)).first()  # noqa: E712
+    if super_admin and not super_admin.password_reset_token:
+        super_admin.password_reset_token = token_urlsafe(16)
+        super_admin.password_reset_requested_at = datetime.utcnow()
+        session.add(super_admin)
+        session.commit()

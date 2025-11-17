@@ -44,6 +44,7 @@ class ScheduleService:
         schedule = Schedule(
             name=payload.name,
             group_id=group.id,
+            organization_id=group.organization_id,
             frequency=payload.frequency,
             interval_minutes=interval,
             enabled=payload.enabled,

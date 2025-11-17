@@ -11,6 +11,7 @@ class ScanRequest(BaseModel):
     ip: Optional[str] = None
     benchmark_id: str = Field(description="Benchmark identifier to execute")
     tags: List[str] = Field(default_factory=list)
+    organization_id: Optional[int] = Field(default=None, description="Owning organization context")
 
 
 class ScanResultView(BaseModel):
@@ -33,6 +34,7 @@ class ScanSummary(BaseModel):
     hostname: str
     benchmark_id: str
     group_id: Optional[int]
+    organization_id: Optional[int]
     status: str
     result: str
     severity: str
@@ -59,6 +61,7 @@ class ScanJobView(BaseModel):
     group_id: int
     hostname: str
     schedule_id: Optional[int]
+    organization_id: Optional[int]
     triggered_by: str
     status: str
     created_at: datetime
@@ -70,6 +73,7 @@ class ReportView(BaseModel):
     id: int
     scan_id: int
     benchmark_id: str
+    organization_id: Optional[int]
     hostname: str
     score: float
     summary: str

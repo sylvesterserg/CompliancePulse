@@ -39,7 +39,7 @@ class ScanService:
             rules=rules,
             triggered_by="api",
             extra_tags=request.tags,
-            allow_ai_summary=allow_ai,
+            organization_id=request.organization_id,
         )
         return self._build_scan_detail(result.scan, result.results)
 
@@ -111,6 +111,7 @@ class ScanService:
             triggered_by=scan.triggered_by,
             tags=tags,
             output_path=scan.output_path,
+            organization_id=scan.organization_id,
         )
 
     def _build_scan_detail(self, scan: Scan, results: List[ScanResult]) -> ScanDetail:
@@ -154,6 +155,7 @@ class ScanService:
             output_path=report.output_path,
             last_run=report.last_run,
             created_at=report.created_at,
+            organization_id=report.organization_id,
         )
 
     def _build_job_view(self, job: ScanJob) -> ScanJobView:
@@ -167,6 +169,7 @@ class ScanService:
             created_at=job.created_at,
             started_at=job.started_at,
             completed_at=job.completed_at,
+            organization_id=job.organization_id,
         )
 
     def _load_results(self, scan_id: int) -> List[ScanResult]:

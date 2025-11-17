@@ -24,6 +24,21 @@ docker compose down
 - **Backend API**: http://localhost:8000
 - **API Documentation**: http://localhost:8000/docs
 
+## Billing Configuration
+
+CompliancePulse now ships with a full Stripe-backed subscription stack. Configure these environment variables for production deployments:
+
+| Variable | Description |
+| --- | --- |
+| `STRIPE_PUBLIC_KEY` | Publishable key used by the UI for portal redirects |
+| `STRIPE_SECRET_KEY` | Secret key for creating customers and checkout sessions |
+| `STRIPE_WEBHOOK_SECRET` | Endpoint secret for verifying webhook signatures |
+| `STRIPE_PRICE_FREE` / `STRIPE_PRICE_PRO` / `STRIPE_PRICE_ENTERPRISE` | Price IDs that map to each SaaS plan |
+| `BILLING_OWNER_TOKEN` | Optional header/query token required to access `/billing` routes |
+| `APP_BASE_URL` | External URL used for Stripe success/cancel URLs |
+
+All new organizations receive a 14-day trial window before plan limits are enforced. The dashboard and billing pages highlight trial status and remaining days.
+
 ## Development
 
 ```bash
@@ -106,6 +121,10 @@ podman run -d --name compliancepulse \
   -p 8000:8000 \
   -e DB_URL=sqlite:////app/data/compliancepulse.db \
   -e ENVIRONMENT=production \
+  -e APP_BASE_URL=https://compliancepulse.example.com \
+  -e STRIPE_PUBLIC_KEY=pk_test_xxx \
+  -e STRIPE_SECRET_KEY=sk_test_xxx \
+  -e STRIPE_WEBHOOK_SECRET=whsec_xxx \
   -v ./data:/app/data:Z \
   -v ./logs:/app/logs:Z \
   compliancepulse

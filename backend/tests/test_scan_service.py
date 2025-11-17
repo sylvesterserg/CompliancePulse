@@ -1,9 +1,9 @@
 import pytest
 from sqlmodel import Session
 
-from app.models import Benchmark, Rule
-from app.schemas import ScanRequest
-from app.services.scan_service import ScanService
+from backend.app.models import Benchmark, Rule
+from backend.app.schemas import ScanRequest
+from backend.app.services.scan_service import ScanService
 
 
 def _seed_benchmark(session: Session) -> Benchmark:

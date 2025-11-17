@@ -7,7 +7,8 @@ from typing import Callable
 
 from sqlmodel import Session, select
 
-from app.models import RuleGroup, ScanJob, Schedule
+from backend.app.billing.utils import get_billing_state, plan_allows_feature
+from backend.app.models import RuleGroup, ScanJob, Schedule
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -29,6 +30,13 @@ class ScheduleManager:
         now = datetime.utcnow()
         session = self.session_factory()
         try:
+            organization = get_billing_state(session)
+            if organization and not organization.is_subscription_active():
+                logger.info("Skipping schedules - subscription inactive")
+                return
+            if organization and not plan_allows_feature(organization, "schedules"):
+                logger.debug("Plan does not include schedules; skipping tick")
+                return
             schedules = session.exec(select(Schedule).where(Schedule.enabled == True)).all()  # noqa: E712
             for schedule in schedules:
                 next_run = schedule.next_run or now

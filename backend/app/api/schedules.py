@@ -5,6 +5,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 
+from ..billing.dependencies import count_schedules, require_feature
 from ..schemas import ScheduleCreate, ScheduleView
 from ..services.schedule_service import ScheduleService
 from .deps import get_db_session
@@ -25,6 +26,7 @@ def list_schedules(session: Session = Depends(get_db_session)) -> List[ScheduleV
 def create_schedule(
     payload: ScheduleCreate,
     session: Session = Depends(get_db_session),
+    _: Session = Depends(require_feature("schedules", count_schedules)),
 ) -> ScheduleView:
     try:
         return _get_service(session).create_schedule(payload)

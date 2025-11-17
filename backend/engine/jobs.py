@@ -5,7 +5,7 @@ import logging
 
 from sqlmodel import Session
 
-from app.database import engine
+from backend.app.database import engine
 
 from .scheduler import ScheduleManager
 

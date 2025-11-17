@@ -12,6 +12,14 @@ services:
     environment:
       - DB_URL=sqlite:////app/data/compliancepulse.db
       - ENVIRONMENT=development
+      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8000}
+      - STRIPE_PUBLIC_KEY=${STRIPE_PUBLIC_KEY:-}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - STRIPE_PRICE_FREE=${STRIPE_PRICE_FREE:-price_free}
+      - STRIPE_PRICE_PRO=${STRIPE_PRICE_PRO:-price_pro}
+      - STRIPE_PRICE_ENTERPRISE=${STRIPE_PRICE_ENTERPRISE:-price_enterprise}
+      - BILLING_OWNER_TOKEN=${BILLING_OWNER_TOKEN:-}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -25,6 +33,15 @@ services:
       retries: 3
       start_period: 10s
 
+  backend:
+    image: compliancepulse-backend
+    container_name: compliancepulse-backend-shell
+    command: ["sleep", "infinity"]
+    depends_on:
+      api:
+        condition: service_started
+    profiles: ["assets"]
+
   worker:
     image: compliancepulse-backend
     container_name: compliancepulse-worker
@@ -32,6 +49,14 @@ services:
     environment:
       - DB_URL=sqlite:////app/data/compliancepulse.db
       - ENVIRONMENT=development
+      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8000}
+      - STRIPE_PUBLIC_KEY=${STRIPE_PUBLIC_KEY:-}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - STRIPE_PRICE_FREE=${STRIPE_PRICE_FREE:-price_free}
+      - STRIPE_PRICE_PRO=${STRIPE_PRICE_PRO:-price_pro}
+      - STRIPE_PRICE_ENTERPRISE=${STRIPE_PRICE_ENTERPRISE:-price_enterprise}
+      - BILLING_OWNER_TOKEN=${BILLING_OWNER_TOKEN:-}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -49,6 +74,14 @@ services:
     environment:
       - DB_URL=sqlite:////app/data/compliancepulse.db
       - ENVIRONMENT=development
+      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8000}
+      - STRIPE_PUBLIC_KEY=${STRIPE_PUBLIC_KEY:-}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - STRIPE_PRICE_FREE=${STRIPE_PRICE_FREE:-price_free}
+      - STRIPE_PRICE_PRO=${STRIPE_PRICE_PRO:-price_pro}
+      - STRIPE_PRICE_ENTERPRISE=${STRIPE_PRICE_ENTERPRISE:-price_enterprise}
+      - BILLING_OWNER_TOKEN=${BILLING_OWNER_TOKEN:-}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -67,3 +100,13 @@ services:
     command: ["sh", "-c", "npm install && npm run build:css"]
     profiles: ["assets"]
     restart: "no"
+
+  frontend:
+    image: nginx:1.25-alpine
+    container_name: compliancepulse-frontend
+    volumes:
+      - ./frontend/static:/usr/share/nginx/html:ro
+    profiles: ["assets"]
+    ports:
+      - "8080:80"
+    restart: unless-stopped

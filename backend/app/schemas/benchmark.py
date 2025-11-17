@@ -68,9 +68,9 @@ class RuleSummary(BaseModel):
     benchmark_id: str
     title: str
     severity: str
-    status: str
-    tags: List[str]
-    last_run: Optional[datetime]
+    status: str = "active"
+    tags: List[str] = Field(default_factory=list)
+    last_run: Optional[datetime] = None
 
 
 class RuleDetail(RuleSummary):

@@ -1,0 +1,29 @@
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60">
+  <div class="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <h2 class="text-xl font-semibold text-slate-900">Upgrade your workspace</h2>
+      <button class="text-slate-400 hover:text-slate-600" onclick="document.getElementById('modal-root').innerHTML = ''">×</button>
+    </div>
+    <p class="mt-2 text-sm text-slate-500">
+      Unlock higher limits, AI summaries, and the priority worker queue by moving to a paid plan. Select a tier below to continue to Stripe checkout.
+    </p>
+    <div class="mt-4 grid gap-4 md:grid-cols-2">
+      {% for plan in plans if plan.key != 'free' %}
+      <div class="rounded-2xl border border-slate-200 p-4">
+        <p class="text-sm font-semibold text-slate-900">{{ plan.name }}</p>
+        <p class="text-xs text-slate-500">{{ plan.description }}</p>
+        <ul class="mt-3 space-y-1 text-xs text-slate-600">
+          {% for feature, value in plan.features.items() %}
+          <li>• {{ feature.replace('_',' ')|title }}: {{ plan.feature_label(feature) }}</li>
+          {% endfor %}
+        </ul>
+        <form method="post" action="/billing/subscribe/{{ plan.key }}" class="mt-4">
+          <button type="submit" class="w-full rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">
+            Continue to Stripe
+          </button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>

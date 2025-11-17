@@ -134,3 +134,66 @@ class ScanJob(SQLModel, table=True):
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     scan_id: Optional[int] = Field(default=None, foreign_key="scan.id")
+
+
+def _default_trial_end() -> datetime:
+    return datetime.utcnow() + timedelta(days=14)
+
+
+class Organization(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    slug: str = Field(index=True, sa_column_kwargs={"unique": True})
+    billing_email: Optional[str] = None
+    stripe_customer_id: Optional[str] = Field(default=None, index=True)
+    stripe_subscription_id: Optional[str] = Field(default=None, index=True)
+    current_plan: str = Field(default="free")
+    plan_status: str = Field(default="trialing")
+    trial_end: datetime = Field(default_factory=_default_trial_end)
+    next_billing_date: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    def is_trial_active(self) -> bool:
+        return bool(self.trial_end and self.trial_end > datetime.utcnow())
+
+    def days_remaining_in_trial(self) -> int:
+        if not self.trial_end:
+            return 0
+        remaining = (self.trial_end - datetime.utcnow()).days
+        return max(remaining, 0)
+
+    def is_subscription_active(self) -> bool:
+        if self.is_trial_active():
+            return True
+        return self.plan_status in {"active", "trialing"}
+
+    def mark_plan_status(
+        self,
+        *,
+        plan_name: str | None = None,
+        status: str | None = None,
+        trial_end: datetime | None = None,
+        next_billing_date: datetime | None = None,
+        subscription_id: str | None = None,
+        customer_id: str | None = None,
+    ) -> None:
+        if plan_name:
+            self.current_plan = plan_name
+        if status:
+            self.plan_status = status
+        if trial_end:
+            self.trial_end = trial_end
+        if next_billing_date:
+            self.next_billing_date = next_billing_date
+        if subscription_id is not None:
+            self.stripe_subscription_id = subscription_id
+        if customer_id is not None:
+            self.stripe_customer_id = customer_id
+        self.updated_at = datetime.utcnow()
+
+
+class BillingEvent(SQLModel, table=True):
+    id: str = Field(primary_key=True)
+    type: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)

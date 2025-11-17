@@ -8,8 +8,8 @@ from typing import Iterable, List, Sequence
 
 from sqlmodel import Session, select
 
-from app.config import settings
-from app.models import Report, Rule, RuleGroup, Scan, ScanJob, ScanResult
+from backend.app.config import settings
+from backend.app.models import Report, Rule, RuleGroup, Scan, ScanJob, ScanResult
 
 from .ai_summary import summarize_scan
 from .rule_engine import RuleEngine, RuleEvaluation
@@ -40,6 +40,7 @@ class ScanExecutor:
         triggered_by: str = "manual",
         group: RuleGroup | None = None,
         extra_tags: Sequence[str] | None = None,
+        allow_ai_summary: bool = True,
     ) -> ScanExecutionResult:
         rules = list(rules)
         tags = self._collect_rule_tags(rules)
@@ -80,7 +81,14 @@ class ScanExecutor:
         if weighted_total:
             score = round((weighted_pass / weighted_total) * 100, 2)
 
-        summary_bundle = summarize_scan(results)
+        if allow_ai_summary:
+            summary_bundle = summarize_scan(results)
+        else:
+            summary_bundle = {
+                "summary": "AI summaries are unavailable for the current plan.",
+                "key_findings": [],
+                "remediations": ["Upgrade to Pro to unlock AI narratives."],
+            }
         scan.completed_at = datetime.utcnow()
         scan.last_run = scan.completed_at
         scan.status = "completed"
@@ -124,6 +132,7 @@ class ScanExecutor:
         hostname: str | None = None,
         ip: str | None = None,
         triggered_by: str = "automation",
+        allow_ai_summary: bool = True,
     ) -> ScanExecutionResult:
         group = self.session.get(RuleGroup, group_id)
         if not group:
@@ -141,13 +150,15 @@ class ScanExecutor:
             triggered_by=triggered_by,
             group=group,
             extra_tags=json.loads(group.tags_json or "[]"),
+            allow_ai_summary=allow_ai_summary,
         )
 
-    def execute_job(self, job: ScanJob) -> ScanExecutionResult:
+    def execute_job(self, job: ScanJob, allow_ai_summary: bool = True) -> ScanExecutionResult:
         return self.run_for_group(
             group_id=job.group_id,
             hostname=job.hostname,
             triggered_by=job.triggered_by,
+            allow_ai_summary=allow_ai_summary,
         )
 
     def _collect_rule_tags(self, rules: Iterable[Rule]) -> List[str]:

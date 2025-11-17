@@ -8,8 +8,8 @@ import textwrap
 import pytest
 from sqlmodel import Session, SQLModel, create_engine, select
 
-from app.models import Benchmark, Rule
-from app.services.benchmark_loader import PulseBenchmarkLoader
+from backend.app.models import Benchmark, Rule
+from backend.app.services.benchmark_loader import PulseBenchmarkLoader
 
 
 def _bootstrap_memory_session() -> Session:

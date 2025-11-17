@@ -1,5 +1,7 @@
 from .domain import (
     Benchmark,
+    BillingEvent,
+    Organization,
     Report,
     Rule,
     RuleGroup,
@@ -11,6 +13,8 @@ from .domain import (
 
 __all__ = [
     "Benchmark",
+    "BillingEvent",
+    "Organization",
     "Report",
     "Rule",
     "RuleGroup",

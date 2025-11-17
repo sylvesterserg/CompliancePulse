@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 
 from .api import benchmarks, reports, rules, scans, schedules, ui_router
+from .billing.router import router as billing_router
 from .config import settings
 from .database import engine, init_db
 from .models import Benchmark
@@ -35,6 +36,7 @@ app.include_router(scans.router)
 app.include_router(reports.router)
 app.include_router(schedules.router)
 app.include_router(ui_router.router)
+app.include_router(billing_router)
 
 
 @app.on_event("startup")
@@ -57,6 +59,16 @@ def startup_event() -> None:
         if not session.exec(select(Benchmark)).first():
             loader.load_all(session)
         seed_dev_data(session)
+
+
+@app.get("/", include_in_schema=False)
+def service_banner() -> dict[str, str]:
+    return {
+        "service": settings.app_name,
+        "version": settings.version,
+        "status": "running",
+        "landing": "/dashboard",
+    }
 
 
 @app.get("/api")

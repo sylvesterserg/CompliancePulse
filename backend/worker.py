@@ -3,13 +3,20 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from datetime import datetime
+import sys
+from datetime import datetime, timedelta
+from pathlib import Path
 
-from sqlmodel import Session, select
+from sqlmodel import Session, func, select
 
-from app.database import engine
-from app.models import ScanJob, Schedule
-from engine.scan_executor import ScanExecutor
+ROOT = Path(__file__).resolve().parent
+if str(ROOT.parent) not in sys.path:
+    sys.path.insert(0, str(ROOT.parent))
+
+from backend.app.billing.utils import get_billing_state, plan_allows_feature
+from backend.app.database import engine
+from backend.app.models import Scan, ScanJob, Schedule
+from .engine.scan_executor import ScanExecutor
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] worker: %(message)s")
 logger = logging.getLogger("compliancepulse.worker")
@@ -31,6 +38,26 @@ def _claim_job(session: Session) -> ScanJob | None:
     return job
 
 
+def _automation_allowed(session: Session) -> tuple[bool, bool]:
+    organization = get_billing_state(session)
+    if not organization:
+        return True, True
+    allow_ai = plan_allows_feature(organization, "ai_summaries")
+    if not organization.is_subscription_active():
+        logger.warning("Subscription inactive - scheduler paused")
+        return False, allow_ai
+    if not plan_allows_feature(organization, "schedules"):
+        logger.warning("Current plan does not allow automated schedules")
+        return False, allow_ai
+    if organization.current_plan == "free" and not organization.is_trial_active():
+        window_start = datetime.utcnow() - timedelta(hours=1)
+        scan_count = session.exec(select(func.count(Scan.id)).where(Scan.started_at >= window_start)).one()
+        if scan_count >= 3:
+            logger.info("Free plan rate limit hit (%s scans/hr)", scan_count)
+            return False, allow_ai
+    return True, allow_ai
+
+
 def _mark_schedule_run(session: Session, schedule_id: int | None, completed_at: datetime) -> None:
     if not schedule_id:
         return
@@ -46,9 +73,16 @@ def _process_job() -> bool:
         job = _claim_job(session)
         if not job:
             return False
+        allowed, allow_ai = _automation_allowed(session)
+        if not allowed:
+            job.status = "paused"
+            job.error = "Subscription inactive or plan limit"
+            session.add(job)
+            session.commit()
+            return True
         executor = ScanExecutor(session)
         try:
-            result = executor.execute_job(job)
+            result = executor.execute_job(job, allow_ai_summary=allow_ai)
             job.status = "completed"
             job.scan_id = result.scan.id
             job.error = None

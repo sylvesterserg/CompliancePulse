@@ -1,0 +1,16 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="max-w-2xl rounded-2xl bg-white p-8 text-center shadow">
+  <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+    ✓
+  </div>
+  <h1 class="mt-4 text-3xl font-semibold text-slate-900">Subscription updated</h1>
+  <p class="mt-2 text-sm text-slate-500">
+    Stripe confirmed your checkout session. You can safely close this tab or continue exploring the dashboard.
+  </p>
+  <div class="mt-6 flex flex-wrap justify-center gap-3">
+    <a href="/dashboard" class="rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white">Return to dashboard</a>
+    <a href="/billing" class="rounded-full border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700">View billing</a>
+  </div>
+</div>
+{% endblock %}

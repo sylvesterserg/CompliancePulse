@@ -1,0 +1,123 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="grid gap-6 lg:grid-cols-2">
+  <div class="rounded-2xl bg-white p-6 shadow">
+    <h2 class="text-lg font-semibold text-slate-900">Current Plan</h2>
+    <p class="mt-2 text-3xl font-bold text-indigo-600">{{ current_plan.name }}</p>
+    <p class="text-sm text-slate-500">Status: {{ plan_status|replace('_',' ')|title }}</p>
+    {% if trial_days > 0 %}
+    <div class="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      Trial mode: <strong>{{ trial_days }}</strong> days remaining
+    </div>
+    {% endif %}
+    <dl class="mt-4 space-y-2 text-sm text-slate-600">
+      <div class="flex items-center justify-between">
+        <dt>Billing email</dt>
+        <dd>{{ organization.billing_email or 'Not set' }}</dd>
+      </div>
+      <div class="flex items-center justify-between">
+        <dt>Next renewal</dt>
+        <dd>
+          {% if next_billing_date %}
+            {{ next_billing_date.strftime('%b %d, %Y') }}
+          {% elif trial_days > 0 %}
+            After trial ends
+          {% else %}
+            Pending activation
+          {% endif %}
+        </dd>
+      </div>
+    </dl>
+    <div class="mt-6 flex flex-wrap gap-3">
+      <a
+        href="/billing/portal"
+        class="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-slate-800"
+      >
+        Open billing portal
+      </a>
+      <button
+        class="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        hx-get="/billing/modal/upgrade"
+        hx-target="#modal-root"
+        hx-swap="innerHTML"
+      >
+        View upgrade options
+      </button>
+    </div>
+    {% if not stripe_configured %}
+    <p class="mt-4 rounded-lg bg-rose-50 px-4 py-2 text-sm text-rose-700">
+      Stripe keys are not configured. Checkout links will use the built-in simulator.
+    </p>
+    {% endif %}
+  </div>
+  <div class="rounded-2xl bg-white p-6 shadow">
+    <h2 class="text-lg font-semibold text-slate-900">Feature usage</h2>
+    <dl class="mt-4 space-y-4">
+      <div class="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+        <div>
+          <dt class="text-sm text-slate-500">Rules</dt>
+          <dd class="text-2xl font-semibold text-slate-900">{{ usage.rules }}</dd>
+        </div>
+        <span class="text-sm text-slate-500">Limit: {{ current_plan.feature_label('rules') }}</span>
+      </div>
+      <div class="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+        <div>
+          <dt class="text-sm text-slate-500">Schedules</dt>
+          <dd class="text-2xl font-semibold text-slate-900">{{ usage.schedules }}</dd>
+        </div>
+        <span class="text-sm text-slate-500">Limit: {{ current_plan.feature_label('schedules') }}</span>
+      </div>
+      <div class="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+        {% set ai_allowed = current_plan.features.get('ai_summaries') %}
+        <p>AI summaries: <strong>{{ 'Enabled' if ai_allowed or trial_days > 0 else 'Locked' }}</strong></p>
+        {% if not ai_allowed and trial_days == 0 %}
+        <p class="text-xs text-slate-400">Upgrade to Pro or Enterprise to enable automated summaries.</p>
+        {% endif %}
+      </div>
+    </dl>
+  </div>
+</div>
+
+<section class="mt-8">
+  <h2 class="text-xl font-semibold text-slate-900">Compare plans</h2>
+  <div class="mt-4 grid gap-6 lg:grid-cols-3">
+    {% for plan in plans %}
+    <div class="rounded-2xl border {% if plan.key == current_plan.key %}border-indigo-500 shadow-xl{% else %}border-slate-200 shadow{% endif %} bg-white p-6">
+      <p class="text-sm uppercase tracking-wide text-slate-400">{{ plan.highlight or 'Plan' }}</p>
+      <h3 class="mt-2 text-2xl font-bold text-slate-900">{{ plan.name }}</h3>
+      <p class="text-sm text-slate-500">{{ plan.description }}</p>
+      <p class="mt-4 text-3xl font-semibold text-slate-900">
+        {% if plan.price_monthly %}
+          ${{ '%.2f'|format(plan.price_monthly / 100) }}
+        {% elif plan.key == 'free' %}
+          Free
+        {% else %}
+          Custom
+        {% endif %}
+        <span class="text-base font-medium text-slate-500">/mo</span>
+      </p>
+      <ul class="mt-4 space-y-2 text-sm text-slate-600">
+        {% for feature, value in plan.features.items() %}
+        <li class="flex items-center gap-2">
+          <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+          {{ feature.replace('_',' ')|title }}: {{ plan.feature_label(feature) }}
+        </li>
+        {% endfor %}
+      </ul>
+      {% if plan.key == current_plan.key %}
+      <span class="mt-4 inline-flex rounded-full bg-emerald-100 px-4 py-1 text-sm font-semibold text-emerald-700">Current plan</span>
+      {% else %}
+      <form method="post" action="/billing/subscribe/{{ plan.key }}" class="mt-4">
+        <button
+          type="submit"
+          class="w-full rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-500"
+        >
+          {% if plan.price_monthly %}Choose {{ plan.name }}{% else %}Contact us{% endif %}
+        </button>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

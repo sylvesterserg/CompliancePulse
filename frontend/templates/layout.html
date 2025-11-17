@@ -20,10 +20,11 @@
         </div>
         <nav class="mt-4 space-y-1 px-4">
           {% set nav_items = [
-            {"label": "Dashboard", "href": "/", "id": "dashboard", "icon": "home"},
+            {"label": "Dashboard", "href": "/dashboard", "id": "dashboard", "icon": "home"},
             {"label": "Rules", "href": "/rules", "id": "rules", "icon": "document"},
             {"label": "Scans", "href": "/scans", "id": "scans", "icon": "bolt"},
             {"label": "Reports", "href": "/reports", "id": "reports", "icon": "chart"},
+            {"label": "Billing", "href": "/billing", "id": "billing", "icon": "card"},
           ] %}
           {% for item in nav_items %}
           <a

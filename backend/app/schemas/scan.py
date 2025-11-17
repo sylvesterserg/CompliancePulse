@@ -75,9 +75,9 @@ class ReportView(BaseModel):
     summary: str
     key_findings: List[str] = Field(default_factory=list)
     remediations: List[str] = Field(default_factory=list)
-    status: str
-    severity: str
+    status: str = "generated"
+    severity: str = "info"
     tags: List[str] = Field(default_factory=list)
     output_path: Optional[str] = None
-    last_run: Optional[datetime]
+    last_run: Optional[datetime] = None
     created_at: datetime

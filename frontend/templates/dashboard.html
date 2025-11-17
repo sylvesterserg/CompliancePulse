@@ -27,6 +27,24 @@
     {% endif %}
   </div>
 </div>
+<div class="mb-8 rounded-2xl bg-white p-6 shadow">
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <p class="text-sm uppercase tracking-wide text-slate-400">Subscription</p>
+      <p class="text-2xl font-semibold text-slate-900">{{ current_plan.name }} plan</p>
+      <p class="text-sm text-slate-500">{{ plan_status|replace('_',' ')|title }}{% if trial_days %} · Trial ends in {{ trial_days }} days{% endif %}</p>
+    </div>
+    <div class="flex gap-3">
+      <a href="/billing" class="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Manage billing</a>
+      <button
+        class="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+        hx-get="/billing/modal/upgrade"
+        hx-target="#modal-root"
+        hx-swap="innerHTML"
+      >Upgrade</button>
+    </div>
+  </div>
+</div>
 <div class="grid gap-6 lg:grid-cols-2">
   <div class="rounded-2xl bg-white p-6 shadow">
     <div class="flex items-center justify-between">

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from engine.jobs import run
+from .engine.jobs import run
 
 
 if __name__ == "__main__":

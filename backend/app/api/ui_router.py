@@ -8,8 +8,16 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, func, select
 
+from ..billing.dependencies import (
+    count_rules,
+    count_schedules,
+    get_current_organization,
+    require_active_subscription,
+    require_feature,
+)
+from ..billing.plans import get_plan
 from ..config import settings
-from ..models import Benchmark, Report, Rule, RuleGroup, Scan, ScanJob, Schedule
+from ..models import Benchmark, Organization, Report, Rule, RuleGroup, Scan, ScanJob, Schedule
 from ..schemas import ScanRequest, ScheduleCreate
 from ..services.scan_service import ScanService
 from ..services.schedule_service import ScheduleService
@@ -28,14 +36,33 @@ def _templates() -> Jinja2Templates:
     return _templates_instance
 
 
-def _base_context(request: Request, session: Session, active: str) -> Dict[str, Any]:
-    return {
+def _base_context(
+    request: Request,
+    session: Session,
+    active: str,
+    organization: Organization | None = None,
+) -> Dict[str, Any]:
+    context = {
         "request": request,
         "environment": settings.environment,
         "nav_active": active,
         "health_status": _health_status(session),
         "page_title": active.title(),
     }
+    if organization:
+        try:
+            current_plan = get_plan(organization.current_plan)
+        except KeyError:
+            current_plan = get_plan("free")
+        context.update(
+            {
+                "organization": organization,
+                "current_plan": current_plan,
+                "trial_days": organization.days_remaining_in_trial(),
+                "plan_status": organization.plan_status,
+            }
+        )
+    return context
 
 
 def _health_status(session: Session) -> Dict[str, str]:
@@ -149,12 +176,13 @@ def _render_reports_table(request: Request, scan_service: ScanService) -> HTMLRe
     return _templates().TemplateResponse("partials/reports_table.html", context)
 
 
-@router.get("/", response_class=HTMLResponse)
+@router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(
     request: Request,
     session: Session = Depends(get_db_session),
+    organization: Organization = Depends(get_current_organization),
 ) -> HTMLResponse:
-    scan_service = ScanService(session)
+    scan_service = ScanService(session, organization=organization)
     schedule_service = ScheduleService(session)
     scans = scan_service.list_scans()
     reports = scan_service.list_reports()
@@ -163,7 +191,7 @@ async def dashboard(
     if reports:
         compliance_score = round(sum(report.score for report in reports) / len(reports), 2)
     context = {
-        **_base_context(request, session, "dashboard"),
+        **_base_context(request, session, "dashboard", organization),
         "rules_count": session.exec(select(func.count(Rule.id))).one(),
         "scans_count": session.exec(select(func.count(Scan.id))).one(),
         "last_failed_scans": failed_scans,
@@ -180,9 +208,10 @@ async def dashboard(
 async def rules_page(
     request: Request,
     session: Session = Depends(get_db_session),
+    organization: Organization = Depends(get_current_organization),
 ) -> HTMLResponse:
     context = {
-        **_base_context(request, session, "rules"),
+        **_base_context(request, session, "rules", organization),
         "rules": _rule_list(session),
         "modal_reset": False,
     }
@@ -193,10 +222,11 @@ async def rules_page(
 async def scans_page(
     request: Request,
     session: Session = Depends(get_db_session),
+    organization: Organization = Depends(get_current_organization),
 ) -> HTMLResponse:
-    scan_service = ScanService(session)
+    scan_service = ScanService(session, organization=organization)
     context = {
-        **_base_context(request, session, "scans"),
+        **_base_context(request, session, "scans", organization),
         "scans": scan_service.list_scans(),
     }
     return _templates().TemplateResponse("scans.html", context)
@@ -206,10 +236,11 @@ async def scans_page(
 async def reports_page(
     request: Request,
     session: Session = Depends(get_db_session),
+    organization: Organization = Depends(get_current_organization),
 ) -> HTMLResponse:
-    scan_service = ScanService(session)
+    scan_service = ScanService(session, organization=organization)
     context = {
-        **_base_context(request, session, "reports"),
+        **_base_context(request, session, "reports", organization),
         "reports": scan_service.list_reports(),
     }
     return _templates().TemplateResponse("reports.html", context)
@@ -228,6 +259,7 @@ async def rule_modal(
 async def create_rule(
     request: Request,
     session: Session = Depends(get_db_session),
+    _: Organization = Depends(require_feature("rules", count_rules)),
 ) -> HTMLResponse:
     form = await request.form()
     rule_id = str(form.get("rule_id", "")).strip()
@@ -283,6 +315,7 @@ async def scan_modal(
 async def trigger_scan(
     request: Request,
     session: Session = Depends(get_db_session),
+    organization: Organization = Depends(require_active_subscription),
 ) -> HTMLResponse:
     form = await request.form()
     hostname = str(form.get("hostname", "")).strip()
@@ -291,7 +324,7 @@ async def trigger_scan(
     tags = str(form.get("tags", ""))
     if not hostname or not benchmark_id:
         raise HTTPException(status_code=400, detail="Missing required fields")
-    scan_service = ScanService(session)
+    scan_service = ScanService(session, organization=organization)
     tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
     payload = ScanRequest(hostname=hostname, ip=ip or None, benchmark_id=benchmark_id, tags=tag_list)
     scan_service.start_scan(payload)
@@ -302,9 +335,14 @@ async def trigger_scan(
 async def schedule_modal(
     request: Request,
     session: Session = Depends(get_db_session),
+    organization: Organization = Depends(get_current_organization),
 ) -> HTMLResponse:
     schedule_service = ScheduleService(session)
-    context = {"request": request, "rule_groups": schedule_service.list_rule_groups()}
+    context = {
+        "request": request,
+        "rule_groups": schedule_service.list_rule_groups(),
+        "organization": organization,
+    }
     return _templates().TemplateResponse("modals/schedule_new.html", context)
 
 
@@ -312,6 +350,7 @@ async def schedule_modal(
 async def create_schedule_from_modal(
     request: Request,
     session: Session = Depends(get_db_session),
+    _: Organization = Depends(require_feature("schedules", count_schedules)),
 ) -> HTMLResponse:
     form = await request.form()
     name = str(form.get("name", "")).strip()
@@ -341,6 +380,7 @@ async def delete_schedule_from_dashboard(
     schedule_id: int,
     request: Request,
     session: Session = Depends(get_db_session),
+    _: Organization = Depends(require_active_subscription),
 ) -> HTMLResponse:
     schedule_service = ScheduleService(session)
     try:
@@ -355,6 +395,7 @@ async def run_group_now(
     group_id: int,
     request: Request,
     session: Session = Depends(get_db_session),
+    _: Organization = Depends(require_active_subscription),
 ) -> HTMLResponse:
     scan_service = ScanService(session)
     try:

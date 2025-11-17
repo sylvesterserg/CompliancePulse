@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from sqlmodel import Session, select
 
 from .config import settings
-from .models import Benchmark, Report, Rule, RuleGroup, Scan, Schedule
+from .models import Benchmark, Organization, Report, Rule, RuleGroup, Scan, Schedule
 
 
 def seed_dev_data(session: Session) -> None:
@@ -86,6 +86,16 @@ def seed_dev_data(session: Session) -> None:
             )
         )
     session.commit()
+
+    organization = session.exec(select(Organization).order_by(Organization.created_at)).first()
+    if not organization:
+        organization = Organization(
+            name="Development Lab",
+            slug="dev-lab",
+            billing_email="billing@example.com",
+        )
+        session.add(organization)
+        session.commit()
 
     group = RuleGroup(
         name="Baseline Controls",

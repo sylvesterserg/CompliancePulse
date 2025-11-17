@@ -5,7 +5,8 @@ from typing import List
 
 from sqlmodel import Session, select
 
-from ..models import Benchmark, Report, Rule, RuleGroup, Scan, ScanJob, ScanResult
+from ..billing.utils import plan_allows_feature
+from ..models import Benchmark, Organization, Report, Rule, RuleGroup, Scan, ScanJob, ScanResult
 from ..schemas import (
     ReportView,
     ScanDetail,
@@ -14,19 +15,28 @@ from ..schemas import (
     ScanResultView,
     ScanSummary,
 )
-from engine.scan_executor import ScanExecutor
+from ...engine.scan_executor import ScanExecutor
 
 
 class ScanService:
-    def __init__(self, session: Session, executor: ScanExecutor | None = None):
+    def __init__(
+        self,
+        session: Session,
+        executor: ScanExecutor | None = None,
+        organization: Organization | None = None,
+    ):
         self.session = session
         self.executor = executor or ScanExecutor(session)
+        self.organization = organization
 
     def start_scan(self, request: ScanRequest) -> ScanDetail:
         benchmark = self.session.get(Benchmark, request.benchmark_id)
         if not benchmark:
             raise ValueError(f"Benchmark '{request.benchmark_id}' not found")
         rules = self.session.exec(select(Rule).where(Rule.benchmark_id == request.benchmark_id)).all()
+        allow_ai = True
+        if self.organization:
+            allow_ai = plan_allows_feature(self.organization, "ai_summaries")
         result = self.executor.run_for_rules(
             hostname=request.hostname,
             ip=request.ip,
@@ -34,6 +44,7 @@ class ScanService:
             rules=rules,
             triggered_by="api",
             extra_tags=request.tags,
+            allow_ai_summary=allow_ai,
         )
         return self._build_scan_detail(result.scan, result.results)
 

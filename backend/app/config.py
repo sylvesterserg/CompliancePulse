@@ -25,6 +25,15 @@ class Settings(BaseModel):
     frontend_dir: Path = PROJECT_ROOT / "frontend"
     frontend_template_dir: Path = PROJECT_ROOT / "frontend" / "templates"
     frontend_static_dir: Path = PROJECT_ROOT / "frontend" / "static"
+    app_base_url: str = "http://localhost:8000"
+    stripe_public_key: str = ""
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_price_free: str = "price_free"
+    stripe_price_pro: str = "price_pro"
+    stripe_price_enterprise: str = "price_enterprise"
+    billing_owner_token: str | None = None
+    trial_days: int = 14
 
     @classmethod
     def load(cls) -> "Settings":
@@ -35,6 +44,9 @@ class Settings(BaseModel):
         benchmark_dir = os.getenv("BENCHMARK_DIR")
         timeout = os.getenv("SHELL_TIMEOUT")
         environment = os.getenv("ENVIRONMENT")
+        app_base_url = os.getenv("APP_BASE_URL")
+        if app_base_url:
+            values["app_base_url"] = app_base_url.rstrip("/")
         if environment:
             values["environment"] = environment
         if db_url:
@@ -58,6 +70,30 @@ class Settings(BaseModel):
             values["frontend_template_dir"] = Path(frontend_templates)
         if frontend_static:
             values["frontend_static_dir"] = Path(frontend_static)
+        stripe_public_key = os.getenv("STRIPE_PUBLIC_KEY")
+        stripe_secret_key = os.getenv("STRIPE_SECRET_KEY")
+        stripe_webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+        stripe_price_free = os.getenv("STRIPE_PRICE_FREE")
+        stripe_price_pro = os.getenv("STRIPE_PRICE_PRO")
+        stripe_price_enterprise = os.getenv("STRIPE_PRICE_ENTERPRISE")
+        billing_owner_token = os.getenv("BILLING_OWNER_TOKEN")
+        trial_days = os.getenv("TRIAL_DAYS")
+        if stripe_public_key:
+            values["stripe_public_key"] = stripe_public_key
+        if stripe_secret_key:
+            values["stripe_secret_key"] = stripe_secret_key
+        if stripe_webhook_secret:
+            values["stripe_webhook_secret"] = stripe_webhook_secret
+        if stripe_price_free:
+            values["stripe_price_free"] = stripe_price_free
+        if stripe_price_pro:
+            values["stripe_price_pro"] = stripe_price_pro
+        if stripe_price_enterprise:
+            values["stripe_price_enterprise"] = stripe_price_enterprise
+        if billing_owner_token:
+            values["billing_owner_token"] = billing_owner_token
+        if trial_days:
+            values["trial_days"] = int(trial_days)
         return cls(**values)
 
 

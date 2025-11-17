@@ -10,8 +10,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
-from app.config import settings
-from app.models import Rule
+from backend.app.config import settings
+from backend.app.models import Rule
 
 
 @dataclass

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List
 
-from app.models import ScanResult
+from backend.app.models import ScanResult
 
 
 def summarize_scan(results: Iterable[ScanResult]) -> Dict[str, Any]:

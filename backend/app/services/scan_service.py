@@ -18,9 +18,10 @@ from engine.scan_executor import ScanExecutor
 
 
 class ScanService:
-    def __init__(self, session: Session, executor: ScanExecutor | None = None):
+    def __init__(self, session: Session, organization_id: int, executor: ScanExecutor | None = None):
         self.session = session
-        self.executor = executor or ScanExecutor(session)
+        self.organization_id = organization_id
+        self.executor = executor or ScanExecutor(session, organization_id=organization_id)
 
     def start_scan(self, request: ScanRequest) -> ScanDetail:
         benchmark = self.session.get(Benchmark, request.benchmark_id)
@@ -68,11 +69,14 @@ class ScanService:
         group = self.session.get(RuleGroup, group_id)
         if not group:
             raise ValueError("Rule group not found")
+        if group.organization_id != self.organization_id:
+            raise ValueError("Rule group not found for this organization")
         job = ScanJob(
             group_id=group.id,
             hostname=hostname or group.default_hostname,
             triggered_by=triggered_by,
             status="pending",
+            organization_id=self.organization_id,
         )
         self.session.add(job)
         self.session.commit()

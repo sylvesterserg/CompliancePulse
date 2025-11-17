@@ -12,11 +12,18 @@ services:
     environment:
       - DB_URL=sqlite:////app/data/compliancepulse.db
       - ENVIRONMENT=development
+      - SESSION_SECRET=changeme-super-secret
+      - SESSION_BACKEND=redis
+      - REDIS_URL=redis://redis:6379/0
+      - SESSION_COOKIE_NAME=cp_session
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./frontend/templates:/app/frontend/templates
       - ./frontend/static:/app/frontend/static
+    depends_on:
+      redis:
+        condition: service_started
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -32,6 +39,7 @@ services:
     environment:
       - DB_URL=sqlite:////app/data/compliancepulse.db
       - ENVIRONMENT=development
+      - SESSION_SECRET=changeme-super-secret
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -49,6 +57,7 @@ services:
     environment:
       - DB_URL=sqlite:////app/data/compliancepulse.db
       - ENVIRONMENT=development
+      - SESSION_SECRET=changeme-super-secret
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -67,3 +76,11 @@ services:
     command: ["sh", "-c", "npm install && npm run build:css"]
     profiles: ["assets"]
     restart: "no"
+
+  redis:
+    image: redis:7-alpine
+    container_name: compliancepulse-redis
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    ports:
+      - "6379:6379"
+    restart: unless-stopped

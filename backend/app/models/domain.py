@@ -1,9 +1,41 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from enum import Enum
 from typing import Optional
 
 from sqlmodel import Field, SQLModel
+
+
+class MembershipRole(str, Enum):
+    OWNER = "OWNER"
+    ADMIN = "ADMIN"
+    MEMBER = "MEMBER"
+
+
+class Organization(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    slug: str = Field(index=True, sa_column_kwargs={"unique": True})
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class User(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(index=True, sa_column_kwargs={"unique": True})
+    hashed_password: str
+    is_active: bool = Field(default=True)
+    is_verified: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class UserOrganization(SQLModel, table=True):
+    user_id: int = Field(foreign_key="user.id", primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", primary_key=True)
+    role: MembershipRole = Field(default=MembershipRole.MEMBER)
+    joined_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class Benchmark(SQLModel, table=True):
@@ -22,6 +54,7 @@ class Benchmark(SQLModel, table=True):
 
 class Rule(SQLModel, table=True):
     id: str = Field(primary_key=True, index=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     benchmark_id: str = Field(foreign_key="benchmark.id", index=True)
     title: str
     description: str
@@ -42,6 +75,7 @@ class Rule(SQLModel, table=True):
 
 class RuleGroup(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     name: str
     benchmark_id: str = Field(foreign_key="benchmark.id", index=True)
     description: Optional[str] = None
@@ -56,6 +90,7 @@ class RuleGroup(SQLModel, table=True):
 
 class Scan(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     hostname: str
     ip: Optional[str] = None
     benchmark_id: str = Field(foreign_key="benchmark.id")
@@ -77,6 +112,7 @@ class Scan(SQLModel, table=True):
 
 class ScanResult(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     scan_id: int = Field(foreign_key="scan.id", index=True)
     rule_id: str = Field(foreign_key="rule.id")
     rule_title: str
@@ -93,6 +129,7 @@ class ScanResult(SQLModel, table=True):
 
 class Report(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     scan_id: int = Field(foreign_key="scan.id")
     benchmark_id: str = Field(foreign_key="benchmark.id")
     hostname: str
@@ -110,6 +147,7 @@ class Report(SQLModel, table=True):
 
 class Schedule(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     name: str
     group_id: int = Field(foreign_key="rulegroup.id")
     frequency: str = Field(default="daily")
@@ -124,6 +162,7 @@ class Schedule(SQLModel, table=True):
 
 class ScanJob(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     group_id: int = Field(foreign_key="rulegroup.id")
     schedule_id: Optional[int] = Field(default=None, foreign_key="schedule.id")
     hostname: str

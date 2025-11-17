@@ -46,6 +46,7 @@ class ScheduleManager:
             schedule_id=schedule.id,
             hostname=group.default_hostname,
             triggered_by=f"schedule:{schedule.id}",
+            organization_id=schedule.organization_id,
         )
         session.add(job)
         schedule.next_run = datetime.utcnow() + timedelta(minutes=max(schedule.interval_minutes or 60, 5))

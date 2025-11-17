@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>New Organization · {{ app_name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}" />
+  </head>
+  <body class="flex min-h-screen items-center justify-center bg-slate-100 px-4">
+    <div class="w-full max-w-lg rounded-2xl bg-white p-8 shadow-xl">
+      <div class="mb-6 text-center">
+        <h1 class="text-2xl font-semibold text-slate-900">Create a new organization</h1>
+        <p class="text-sm text-slate-500">You're currently signed in as {{ current_user.email }}.</p>
+      </div>
+      {% if error %}
+      <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
+        {% if error is string %}{{ error }}{% else %}Please verify the submitted form.{% endif %}
+      </div>
+      {% endif %}
+      <form method="post" class="space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+        <label class="block text-sm font-semibold text-slate-600">
+          Organization Name
+          <input
+            name="name"
+            class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+            placeholder="Rocket Labs"
+            required
+          />
+        </label>
+        <button type="submit" class="w-full rounded-full bg-indigo-600 py-2 text-sm font-semibold text-white hover:bg-indigo-500">
+          Create Organization
+        </button>
+      </form>
+      <p class="mt-6 text-center text-sm text-slate-500">
+        <a href="/" class="font-semibold text-indigo-600">Back to dashboard</a>
+      </p>
+    </div>
+  </body>
+</html>

@@ -1,5 +1,7 @@
 from .domain import (
     Benchmark,
+    MembershipRole,
+    Organization,
     Report,
     Rule,
     RuleGroup,
@@ -7,10 +9,14 @@ from .domain import (
     ScanJob,
     ScanResult,
     Schedule,
+    User,
+    UserOrganization,
 )
 
 __all__ = [
     "Benchmark",
+    "MembershipRole",
+    "Organization",
     "Report",
     "Rule",
     "RuleGroup",
@@ -18,4 +24,6 @@ __all__ = [
     "ScanJob",
     "ScanResult",
     "Schedule",
+    "User",
+    "UserOrganization",
 ]

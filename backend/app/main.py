@@ -75,6 +75,7 @@ app.include_router(reports.router)
 app.include_router(schedules.router)
 app.include_router(security.router)
 app.include_router(ui_router.router)
+app.include_router(admin_router)
 
 
 @app.middleware("http")

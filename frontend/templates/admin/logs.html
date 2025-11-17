@@ -1,0 +1,22 @@
+{% extends "admin/layout.html" %}
+
+{% block content %}
+<div class="mb-8">
+  <h2 class="text-2xl font-semibold text-white">Platform Logs</h2>
+  <p class="text-sm text-slate-400">Last 100 events across billing, scheduling, and worker subsystems.</p>
+</div>
+
+<div class="space-y-3">
+  {% for log in logs %}
+  <div class="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3">
+    <div class="flex items-center justify-between text-xs text-slate-500">
+      <span class="uppercase tracking-widest">{{ log.source }}</span>
+      <span>{{ log.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+    </div>
+    <p class="mt-1 text-sm text-white">{{ log.message }}</p>
+  </div>
+  {% else %}
+  <p class="text-slate-500">No logs recorded.</p>
+  {% endfor %}
+</div>
+{% endblock %}

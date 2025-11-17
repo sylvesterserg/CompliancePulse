@@ -1,0 +1,65 @@
+{% extends "admin/layout.html" %}
+
+{% block content %}
+<div class="mb-8">
+  <h2 class="text-2xl font-semibold text-white">Active Scans</h2>
+  <p class="text-sm text-slate-400">Track platform-wide executions and pending queue depth.</p>
+</div>
+
+<div class="grid gap-6 lg:grid-cols-3">
+  <div class="lg:col-span-2 rounded-xl border border-slate-800 bg-slate-900/50">
+    <table class="min-w-full divide-y divide-slate-800 text-sm">
+      <thead class="text-xs uppercase tracking-wide text-slate-400">
+        <tr>
+          <th class="px-4 py-3 text-left">Scan</th>
+          <th class="px-4 py-3 text-left">Status</th>
+          <th class="px-4 py-3 text-left">Org</th>
+          <th class="px-4 py-3 text-left">Score</th>
+          <th class="px-4 py-3 text-left">Triggered</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-800">
+        {% for scan in scans %}
+        <tr>
+          <td class="px-4 py-3">
+            <p class="text-white font-semibold">{{ scan.hostname }}</p>
+            <p class="text-xs text-slate-400">Benchmark: {{ scan.benchmark_id }}</p>
+          </td>
+          <td class="px-4 py-3">
+            <span class="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-200">{{ scan.status }}</span>
+            <p class="text-xs text-slate-500">{{ scan.result }}</p>
+          </td>
+          <td class="px-4 py-3 text-xs text-slate-400">{{ scan.organization_id or 'n/a' }}</td>
+          <td class="px-4 py-3 text-white">{{ scan.compliance_score }}%</td>
+          <td class="px-4 py-3 text-xs text-slate-400">{{ scan.triggered_by }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" class="px-4 py-4 text-center text-slate-500">No scans yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-5" id="queue">
+    <div class="flex items-center justify-between">
+      <h3 class="text-lg font-semibold text-white">Worker Queue</h3>
+      <div class="text-right text-xs text-slate-400">
+        <p>Pending {{ queue_snapshot.pending }}</p>
+        <p>Running {{ queue_snapshot.running }}</p>
+        <p>Completed {{ queue_snapshot.completed }}</p>
+      </div>
+    </div>
+    <div class="mt-4 space-y-3 max-h-[28rem] overflow-y-auto">
+      {% for job in queue %}
+      <div class="rounded-lg border border-slate-800 bg-slate-900/80 px-3 py-2">
+        <p class="text-sm text-white">Job #{{ job.id }} · Group {{ job.group_id }}</p>
+        <p class="text-xs text-slate-400">Host {{ job.hostname }} · {{ job.status }}</p>
+      </div>
+      {% else %}
+      <p class="text-sm text-slate-500">No queued jobs.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

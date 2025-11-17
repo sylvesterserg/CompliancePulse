@@ -1,0 +1,65 @@
+{% extends "admin/layout.html" %}
+
+{% block content %}
+<div class="mb-8">
+  <h2 class="text-2xl font-semibold text-white">Worker Queue & System Health</h2>
+  <p class="text-sm text-slate-400">Monitor worker heartbeats, queue depth, and scheduler activity.</p>
+</div>
+
+<div class="grid gap-6 lg:grid-cols-3">
+  <div class="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+    <p class="text-xs uppercase tracking-wide text-slate-500">Queue Snapshot</p>
+    <div class="mt-3 space-y-2 text-sm text-white">
+      <p>Pending: {{ queue_snapshot.pending }}</p>
+      <p>Running: {{ queue_snapshot.running }}</p>
+      <p>Completed: {{ queue_snapshot.completed }}</p>
+    </div>
+    <p class="mt-4 text-xs text-slate-500">Next schedule: {{ system_health.next_schedule.strftime('%Y-%m-%d %H:%M') if system_health.next_schedule else 'n/a' }}</p>
+  </div>
+  <div class="lg:col-span-2 rounded-xl border border-slate-800 bg-slate-900/50 p-5" id="health">
+    <h3 class="text-lg font-semibold text-white">Worker Heartbeats</h3>
+    <div class="mt-4 space-y-3">
+      {% for worker in worker_statuses %}
+      <div class="rounded-lg border border-slate-800 bg-slate-900/70 px-4 py-3">
+        <div class="flex items-center justify-between">
+          <p class="text-white font-semibold">{{ worker.worker_type }}</p>
+          <span class="text-xs text-slate-400">Queue {{ worker.queue_depth }}</span>
+        </div>
+        <p class="text-xs text-slate-500">Status {{ worker.status }} · Last heartbeat {{ worker.last_heartbeat.strftime('%H:%M:%S') }}</p>
+      </div>
+      {% else %}
+      <p class="text-sm text-slate-500">No workers registered.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="mt-8 grid gap-6 lg:grid-cols-2">
+  <div class="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+    <h3 class="text-lg font-semibold text-white">Active Scan Feed</h3>
+    <div class="mt-4 space-y-3">
+      {% for scan in system_health.active_scans %}
+      <div class="rounded-lg border border-slate-800 bg-slate-900/70 px-4 py-3">
+        <p class="text-sm text-white">Scan #{{ scan.id }} · Host {{ scan.hostname }}</p>
+        <p class="text-xs text-slate-500">Status {{ scan.status }} · Org {{ scan.organization_id or 'n/a' }}</p>
+      </div>
+      {% else %}
+      <p class="text-sm text-slate-500">No active scans.</p>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+    <h3 class="text-lg font-semibold text-white">Recent Health Logs</h3>
+    <div class="mt-4 space-y-3">
+      {% for log in system_health.logs %}
+      <div class="rounded-lg border border-slate-800 bg-slate-900/70 px-4 py-3">
+        <p class="text-sm text-white">{{ log.message }}</p>
+        <p class="text-xs text-slate-500">{{ log.source }} · {{ log.level }}</p>
+      </div>
+      {% else %}
+      <p class="text-sm text-slate-500">No health logs.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

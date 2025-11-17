@@ -1,0 +1,57 @@
+{% extends "admin/layout.html" %}
+
+{% block content %}
+<div class="mb-8">
+  <h2 class="text-2xl font-semibold text-white">Platform Overview</h2>
+  <p class="text-sm text-slate-400">Global telemetry across every tenant.</p>
+</div>
+
+<div class="grid gap-6 md:grid-cols-3">
+  {% for label, value in [
+    ("Organizations", totals.organizations),
+    ("Users", totals.users),
+    ("Rules", totals.rules),
+    ("Active Scans", totals.active_scans),
+    ("Schedules", totals.schedules),
+  ] %}
+  <div class="rounded-xl border border-slate-800 bg-slate-900/70 p-5 shadow-lg">
+    <p class="text-xs uppercase tracking-wide text-slate-500">{{ label }}</p>
+    <p class="mt-2 text-3xl font-semibold text-emerald-300">{{ value }}</p>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="mt-10 grid gap-6 lg:grid-cols-2">
+  <div class="rounded-xl border border-slate-800 bg-slate-900/70 p-6">
+    <h3 class="text-lg font-semibold text-white">Plan Breakdown</h3>
+    <p class="text-sm text-slate-400 mb-4">Track how customers are distributed across plans.</p>
+    <ul class="space-y-3">
+      {% for plan, count in plan_breakdown.items() %}
+      <li class="flex items-center justify-between rounded-lg bg-slate-800/70 px-4 py-2">
+        <span class="uppercase tracking-widest text-xs text-slate-400">{{ plan }}</span>
+        <span class="text-lg font-semibold text-emerald-300">{{ count }}</span>
+      </li>
+      {% else %}
+      <li class="text-sm text-slate-500">No subscription data yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="rounded-xl border border-slate-800 bg-slate-900/70 p-6">
+    <h3 class="text-lg font-semibold text-white">Recent Activity</h3>
+    <p class="text-sm text-slate-400 mb-4">Last ten system events across the platform.</p>
+    <div class="space-y-3">
+      {% for log in recent_logs %}
+      <div class="rounded-lg bg-slate-800/70 px-4 py-3">
+        <div class="flex items-center justify-between text-xs text-slate-400">
+          <span class="uppercase tracking-widest">{{ log.source }}</span>
+          <span>{{ log.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+        </div>
+        <p class="mt-1 text-sm text-white">{{ log.message }}</p>
+      </div>
+      {% else %}
+      <p class="text-sm text-slate-500">No recent logs.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

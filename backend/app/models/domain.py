@@ -78,6 +78,7 @@ class RuleGroup(SQLModel, table=True):
     organization_id: int = Field(foreign_key="organization.id", index=True)
     name: str
     benchmark_id: str = Field(foreign_key="benchmark.id", index=True)
+    organization_id: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
     description: Optional[str] = None
     rule_ids_json: str = Field(default="[]")
     default_hostname: str = "localhost"
@@ -95,6 +96,7 @@ class Scan(SQLModel, table=True):
     ip: Optional[str] = None
     benchmark_id: str = Field(foreign_key="benchmark.id")
     group_id: Optional[int] = Field(default=None, foreign_key="rulegroup.id")
+    organization_id: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
     status: str = Field(default="pending")
     severity: str = Field(default="info")
     tags_json: str = Field(default="[]")
@@ -132,6 +134,7 @@ class Report(SQLModel, table=True):
     organization_id: int = Field(foreign_key="organization.id", index=True)
     scan_id: int = Field(foreign_key="scan.id")
     benchmark_id: str = Field(foreign_key="benchmark.id")
+    organization_id: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
     hostname: str
     score: float
     summary: str
@@ -150,6 +153,7 @@ class Schedule(SQLModel, table=True):
     organization_id: int = Field(foreign_key="organization.id", index=True)
     name: str
     group_id: int = Field(foreign_key="rulegroup.id")
+    organization_id: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
     frequency: str = Field(default="daily")
     interval_minutes: int = Field(default=1440)
     enabled: bool = Field(default=True)
@@ -165,6 +169,7 @@ class ScanJob(SQLModel, table=True):
     organization_id: int = Field(foreign_key="organization.id", index=True)
     group_id: int = Field(foreign_key="rulegroup.id")
     schedule_id: Optional[int] = Field(default=None, foreign_key="schedule.id")
+    organization_id: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
     hostname: str
     triggered_by: str = Field(default="scheduler")
     status: str = Field(default="pending")

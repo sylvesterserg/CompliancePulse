@@ -1,24 +1,22 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import List, Optional
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import Column, Text
 from sqlmodel import Field, SQLModel
+
+
+class MembershipRole(str, Enum):
+    OWNER = "OWNER"
+    ADMIN = "ADMIN"
+    MEMBER = "MEMBER"
 
 
 class Organization(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     slug: str = Field(index=True, sa_column_kwargs={"unique": True})
-    plan_tier: str = Field(default="starter")
-    seat_limit: int = Field(default=5)
-    is_active: bool = Field(default=True)
-    subscription_status: str = Field(default="trialing")
-    subscription_renews_at: Optional[datetime] = None
-    stripe_customer_id: Optional[str] = None
-    stripe_subscription_id: Optional[str] = None
-    suspended_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -26,57 +24,18 @@ class Organization(SQLModel, table=True):
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(index=True, sa_column_kwargs={"unique": True})
-    full_name: str
     hashed_password: str
     is_active: bool = Field(default=True)
-    is_locked: bool = Field(default=False)
-    super_admin: bool = Field(default=False)
-    require_password_reset: bool = Field(default=False)
-    password_reset_token: Optional[str] = None
-    password_reset_requested_at: Optional[datetime] = None
-    last_login_at: Optional[datetime] = None
+    is_verified: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
-class OrganizationMembership(SQLModel, table=True):
-    __table_args__ = (
-        UniqueConstraint("organization_id", "user_id", name="uq_membership"),
-    )
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    organization_id: int = Field(foreign_key="organization.id", index=True)
-    user_id: int = Field(foreign_key="user.id", index=True)
-    role: str = Field(default="member")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-
-
-class FeatureFlag(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    key: str = Field(index=True, sa_column_kwargs={"unique": True})
-    description: Optional[str] = None
-    enabled: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-
-
-class PlatformLog(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    source: str = Field(default="system")
-    level: str = Field(default="info")
-    message: str
-    details_json: str = Field(default="{}")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-
-
-class WorkerStatus(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    worker_type: str
-    status: str = Field(default="idle")
-    queue_depth: int = Field(default=0)
-    last_heartbeat: datetime = Field(default_factory=datetime.utcnow)
-    details_json: str = Field(default="{}")
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+class UserOrganization(SQLModel, table=True):
+    user_id: int = Field(foreign_key="user.id", primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", primary_key=True)
+    role: MembershipRole = Field(default=MembershipRole.MEMBER)
+    joined_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class Benchmark(SQLModel, table=True):
@@ -95,6 +54,7 @@ class Benchmark(SQLModel, table=True):
 
 class Rule(SQLModel, table=True):
     id: str = Field(primary_key=True, index=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     benchmark_id: str = Field(foreign_key="benchmark.id", index=True)
     title: str
     description: str
@@ -115,6 +75,7 @@ class Rule(SQLModel, table=True):
 
 class RuleGroup(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     name: str
     benchmark_id: str = Field(foreign_key="benchmark.id", index=True)
     organization_id: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
@@ -130,6 +91,7 @@ class RuleGroup(SQLModel, table=True):
 
 class Scan(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     hostname: str
     ip: Optional[str] = None
     benchmark_id: str = Field(foreign_key="benchmark.id")
@@ -152,6 +114,7 @@ class Scan(SQLModel, table=True):
 
 class ScanResult(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     scan_id: int = Field(foreign_key="scan.id", index=True)
     rule_id: str = Field(foreign_key="rule.id")
     rule_title: str
@@ -168,6 +131,7 @@ class ScanResult(SQLModel, table=True):
 
 class Report(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     scan_id: int = Field(foreign_key="scan.id")
     benchmark_id: str = Field(foreign_key="benchmark.id")
     organization_id: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
@@ -186,6 +150,7 @@ class Report(SQLModel, table=True):
 
 class Schedule(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     name: str
     group_id: int = Field(foreign_key="rulegroup.id")
     organization_id: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
@@ -201,6 +166,7 @@ class Schedule(SQLModel, table=True):
 
 class ScanJob(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
     group_id: int = Field(foreign_key="rulegroup.id")
     schedule_id: Optional[int] = Field(default=None, foreign_key="schedule.id")
     organization_id: Optional[int] = Field(default=None, foreign_key="organization.id", index=True)
@@ -212,3 +178,34 @@ class ScanJob(SQLModel, table=True):
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     scan_id: Optional[int] = Field(default=None, foreign_key="scan.id")
+
+
+class AuditLog(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    timestamp: datetime = Field(default_factory=datetime.utcnow, index=True)
+    user_id: Optional[str] = Field(default=None, index=True)
+    organization_id: Optional[str] = Field(default=None, index=True)
+    action_type: str = Field(index=True)
+    resource_type: Optional[str] = Field(default=None, index=True)
+    resource_id: Optional[str] = Field(default=None)
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    metadata_json: str = Field(default="{}", sa_column=Column(Text))
+
+
+class ApiKey(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: Optional[str] = Field(default=None, index=True)
+    name: str
+    hashed_key: str = Field(sa_column=Column(Text, nullable=False))
+    prefix: str = Field(index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_used_at: Optional[datetime] = None
+    is_active: bool = Field(default=True, index=True)
+    scopes_json: str = Field(default="", sa_column=Column(Text))
+
+    @property
+    def scopes(self) -> List[str]:
+        if not self.scopes_json:
+            return []
+        return [scope for scope in self.scopes_json.split(",") if scope]

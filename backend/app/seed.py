@@ -7,21 +7,21 @@ from secrets import token_urlsafe
 
 from sqlmodel import Session, select
 
+from .auth.utils import hash_password
 from .config import settings
 from .models import (
     Benchmark,
-    FeatureFlag,
+    MembershipRole,
     Organization,
-    OrganizationMembership,
-    PlatformLog,
     Report,
     Rule,
     RuleGroup,
     Scan,
     Schedule,
     User,
-    WorkerStatus,
+    UserOrganization,
 )
+from .services.benchmark_loader import PulseBenchmarkLoader
 
 
 def seed_dev_data(session: Session) -> None:
@@ -29,105 +29,73 @@ def seed_dev_data(session: Session) -> None:
 
     if settings.environment.lower() != "development":
         return
-    _seed_platform_entities(session)
-    organizations = session.exec(select(Organization).order_by(Organization.created_at)).all()
-    organization_id = organizations[0].id if organizations else None
 
-    has_rules = session.exec(select(Rule).limit(1)).first()
-    if has_rules:
-        return
+    organization = session.exec(select(Organization).where(Organization.slug == "demo-org")).first()
+    if not organization:
+        organization = Organization(name="Demo Organization", slug="demo-org")
+        session.add(organization)
+        session.commit()
+        session.refresh(organization)
+
+    user = session.exec(select(User).where(User.email == "demo@compliancepulse.io")).first()
+    if not user:
+        user = User(
+            email="demo@compliancepulse.io",
+            hashed_password=hash_password("ChangeMe123!"),
+            is_verified=True,
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        membership = UserOrganization(
+            user_id=user.id,
+            organization_id=organization.id,
+            role=MembershipRole.OWNER,
+        )
+        session.add(membership)
+        session.commit()
+
+    if not session.exec(select(Rule).where(Rule.organization_id == organization.id).limit(1)).first():
+        loader = PulseBenchmarkLoader()
+        loader.load_all(session, organization.id)
 
     benchmark = session.exec(select(Benchmark).limit(1)).first()
     if not benchmark:
-        benchmark = Benchmark(
-            id="rocky-linux-baseline",
-            title="Rocky Linux Baseline",
-            description="Base CIS-aligned checks for Rocky Linux",
-            version="1.0",
-            os_target="Rocky Linux 9",
-            maintainer="CompliancePulse",
-            source="seed",
-            tags_json=json.dumps(["linux", "cis", "baseline"]),
-            schema_version="0.4",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+        return
+
+    rule_ids = [rule.id for rule in session.exec(select(Rule).where(Rule.organization_id == organization.id).limit(5))]
+    if not session.exec(select(RuleGroup).where(RuleGroup.organization_id == organization.id).limit(1)).first():
+        group = RuleGroup(
+            organization_id=organization.id,
+            name="Baseline Controls",
+            benchmark_id=benchmark.id,
+            description="All seeded development rules",
+            rule_ids_json=json.dumps(rule_ids),
+            default_hostname="web-01",
+            tags_json=json.dumps(["baseline", "seed"]),
         )
-        session.add(benchmark)
+        session.add(group)
+        session.commit()
+    else:
+        group = session.exec(select(RuleGroup).where(RuleGroup.organization_id == organization.id)).first()
+
+    if not group:
+        return
+
+    if not session.exec(select(Schedule).where(Schedule.organization_id == organization.id).limit(1)).first():
+        schedule = Schedule(
+            organization_id=organization.id,
+            name="Daily Baseline",
+            group_id=group.id,
+            frequency="daily",
+            interval_minutes=1440,
+            next_run=datetime.utcnow() + timedelta(days=1),
+        )
+        session.add(schedule)
         session.commit()
 
-    rules = [
-        {
-            "id": "pkg-001",
-            "title": "Ensure openssh-clients is installed",
-            "severity": "medium",
-            "command": "rpm -q openssh-clients",
-            "expect": "0",
-            "tags": ["ssh", "packages"],
-        },
-        {
-            "id": "svc-004",
-            "title": "Auditd service enabled",
-            "severity": "high",
-            "command": "systemctl is-enabled auditd",
-            "expect": "enabled",
-            "tags": ["audit", "services"],
-        },
-        {
-            "id": "cfg-010",
-            "title": "Password max days is set",
-            "severity": "low",
-            "command": "grep PASS_MAX_DAYS /etc/login.defs",
-            "expect": "PASS_MAX_DAYS   90",
-            "tags": ["auth", "policy"],
-        },
-    ]
-
-    rule_ids = []
-    for payload in rules:
-        rule_ids.append(payload["id"])
-        session.add(
-            Rule(
-                id=payload["id"],
-                benchmark_id=benchmark.id,
-                title=payload["title"],
-                description=f"Auto-generated rule for {payload['title']}",
-                severity=payload["severity"],
-                remediation="Follow vendor hardening guidance.",
-                references_json=json.dumps(["https://rockylinux.org"]),
-                metadata_json=json.dumps({"category": "seed"}),
-                tags_json=json.dumps(payload["tags"]),
-                check_type="shell",
-                command=payload["command"],
-                expect_type="contains" if payload["severity"] == "low" else "equals",
-                expect_value=payload["expect"],
-                timeout_seconds=10,
-                status="active",
-            )
-        )
-    session.commit()
-
-    group = RuleGroup(
-        name="Baseline Controls",
-        benchmark_id=benchmark.id,
-        description="All seeded development rules",
-        rule_ids_json=json.dumps(rule_ids),
-        default_hostname="web-01",
-        tags_json=json.dumps(["baseline", "seed"]),
-        organization_id=organization_id,
-    )
-    session.add(group)
-    session.commit()
-
-    schedule = Schedule(
-        name="Daily Baseline",
-        group_id=group.id,
-        organization_id=organization_id,
-        frequency="daily",
-        interval_minutes=1440,
-        next_run=datetime.utcnow() + timedelta(days=1),
-    )
-    session.add(schedule)
-    session.commit()
+    if session.exec(select(Scan).where(Scan.organization_id == organization.id).limit(1)).first():
+        return
 
     now = datetime.utcnow()
     ai_payload_success = {
@@ -136,6 +104,7 @@ def seed_dev_data(session: Session) -> None:
         "remediations": ["Continue monitoring daily"],
     }
     scan_success = Scan(
+        organization_id=organization.id,
         hostname="web-01",
         benchmark_id=benchmark.id,
         group_id=group.id,
@@ -146,8 +115,8 @@ def seed_dev_data(session: Session) -> None:
         started_at=now - timedelta(hours=4),
         completed_at=now - timedelta(hours=4) + timedelta(minutes=2),
         last_run=now - timedelta(hours=4) + timedelta(minutes=2),
-        total_rules=3,
-        passed_rules=3,
+        total_rules=len(rule_ids),
+        passed_rules=len(rule_ids),
         output_path="/tmp/scan-success.json",
         summary=ai_payload_success["summary"],
         ai_summary_json=json.dumps(ai_payload_success),
@@ -160,6 +129,7 @@ def seed_dev_data(session: Session) -> None:
         "remediations": ["Install missing packages", "Enable auditd"],
     }
     scan_failed = Scan(
+        organization_id=organization.id,
         hostname="db-01",
         benchmark_id=benchmark.id,
         group_id=group.id,
@@ -170,8 +140,8 @@ def seed_dev_data(session: Session) -> None:
         started_at=now - timedelta(hours=2),
         completed_at=now - timedelta(hours=2) + timedelta(minutes=3),
         last_run=now - timedelta(hours=2) + timedelta(minutes=3),
-        total_rules=3,
-        passed_rules=1,
+        total_rules=len(rule_ids),
+        passed_rules=max(len(rule_ids) - 2, 1),
         output_path="/tmp/scan-failed.json",
         summary=ai_payload_failed["summary"],
         ai_summary_json=json.dumps(ai_payload_failed),
@@ -183,6 +153,7 @@ def seed_dev_data(session: Session) -> None:
     session.commit()
 
     report_success = Report(
+        organization_id=organization.id,
         scan_id=scan_success.id,
         benchmark_id=benchmark.id,
         organization_id=organizations[0].id if organizations else None,
@@ -198,6 +169,7 @@ def seed_dev_data(session: Session) -> None:
         remediations_json=json.dumps(ai_payload_success["remediations"]),
     )
     report_failed = Report(
+        organization_id=organization.id,
         scan_id=scan_failed.id,
         benchmark_id=benchmark.id,
         organization_id=organizations[0].id if organizations else None,

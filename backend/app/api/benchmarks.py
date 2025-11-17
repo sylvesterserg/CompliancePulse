@@ -3,15 +3,22 @@ from __future__ import annotations
 import json
 from typing import List
 
+import json
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, func, select
 
-from ..models import Benchmark, Rule
+from ..auth.dependencies import require_authenticated_user, require_role
+from ..models import Benchmark, MembershipRole, Rule
 from ..schemas import BenchmarkDetail, BenchmarkSummary, RuleDetail, RuleSummary
 from ..services.benchmark_loader import PulseBenchmarkLoader
 from .deps import get_db_session
 
-router = APIRouter(prefix="/benchmarks", tags=["benchmarks"])
+router = APIRouter(
+    prefix="/benchmarks",
+    tags=["benchmarks"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 
 
 def _build_summary(session: Session, benchmark: Benchmark) -> BenchmarkSummary:
@@ -92,9 +99,16 @@ def list_benchmark_rules(
     return [_rule_to_detail(rule) for rule in rules]
 
 
-@router.post("/reload", response_model=List[BenchmarkSummary])
+@router.post(
+    "/reload",
+    response_model=List[BenchmarkSummary],
+    dependencies=[Depends(require_role(MembershipRole.ADMIN))],
+)
 def reload_benchmarks(session: Session = Depends(get_db_session)) -> List[BenchmarkSummary]:
     loader = PulseBenchmarkLoader()
-    loader.load_all(session)
+    organization_id = session.info.get("organization_id")
+    if not organization_id:
+        raise HTTPException(status_code=400, detail="Organization context missing")
+    loader.load_all(session, organization_id)
     benchmarks = session.exec(select(Benchmark)).all()
     return [_build_summary(session, benchmark) for benchmark in benchmarks]

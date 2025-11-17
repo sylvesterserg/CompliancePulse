@@ -1,10 +1,12 @@
 {% extends "layout.html" %}
 {% block content %}
+{% set can_manage = membership.role in ['ADMIN', 'OWNER'] %}
 <div class="flex flex-wrap items-center justify-between gap-4">
   <div>
     <h1 class="text-2xl font-semibold text-slate-900">Rules Catalog</h1>
     <p class="text-sm text-slate-500">{{ rules|length }} controls loaded</p>
   </div>
+  {% if can_manage %}
   <button
     class="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-500"
     hx-get="/rules/modal/new"
@@ -13,6 +15,7 @@
   >
     New Rule
   </button>
+  {% endif %}
 </div>
 <div class="mt-6 overflow-hidden rounded-2xl bg-white shadow">
   <table class="min-w-full text-left text-sm">

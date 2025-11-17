@@ -13,7 +13,7 @@ class Settings(BaseModel):
     """Runtime configuration for the CompliancePulse API."""
 
     app_name: str = "CompliancePulse API"
-    version: str = "0.4.0"
+    version: str = "0.6.0"
     environment: str = "development"
     database_url: str = f"sqlite:///{DEFAULT_DB_PATH.as_posix()}"
     benchmark_dir: Path = BACKEND_ROOT / "benchmarks"
@@ -25,6 +25,13 @@ class Settings(BaseModel):
     frontend_dir: Path = PROJECT_ROOT / "frontend"
     frontend_template_dir: Path = PROJECT_ROOT / "frontend" / "templates"
     frontend_static_dir: Path = PROJECT_ROOT / "frontend" / "static"
+    session_cookie_name: str = "cp_session"
+    session_secret: str = "change-me-session-secret"
+    session_max_age: int = 60 * 60 * 24 * 7
+    session_backend: str = "memory"
+    redis_url: str | None = None
+    cookie_secure: bool = False
+    csrf_header_name: str = "X-CSRF-Token"
 
     @classmethod
     def load(cls) -> "Settings":
@@ -58,6 +65,27 @@ class Settings(BaseModel):
             values["frontend_template_dir"] = Path(frontend_templates)
         if frontend_static:
             values["frontend_static_dir"] = Path(frontend_static)
+        session_secret = os.getenv("SESSION_SECRET")
+        if session_secret:
+            values["session_secret"] = session_secret
+        cookie_name = os.getenv("SESSION_COOKIE_NAME")
+        if cookie_name:
+            values["session_cookie_name"] = cookie_name
+        session_max_age = os.getenv("SESSION_MAX_AGE")
+        if session_max_age:
+            values["session_max_age"] = int(session_max_age)
+        session_backend = os.getenv("SESSION_BACKEND")
+        if session_backend:
+            values["session_backend"] = session_backend
+        redis_url = os.getenv("REDIS_URL")
+        if redis_url:
+            values["redis_url"] = redis_url
+        cookie_secure = os.getenv("SESSION_SECURE_COOKIE")
+        if cookie_secure:
+            values["cookie_secure"] = cookie_secure.lower() in {"1", "true", "yes"}
+        csrf_header = os.getenv("CSRF_HEADER_NAME")
+        if csrf_header:
+            values["csrf_header_name"] = csrf_header
         return cls(**values)
 
 

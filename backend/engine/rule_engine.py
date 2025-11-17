@@ -12,6 +12,7 @@ from typing import Any, Dict, Tuple
 
 from app.config import settings
 from app.models import Rule
+from app.security.utils import ensure_command_allowed
 
 
 @dataclass
@@ -144,6 +145,7 @@ class RuleEngine:
         return stdout, stderr, passed, details
 
     def _run_process(self, command: str, metadata: Dict[str, Any], timeout: int | None = None) -> subprocess.CompletedProcess[str]:
+        ensure_command_allowed(command)
         return subprocess.run(
             command,
             shell=True,

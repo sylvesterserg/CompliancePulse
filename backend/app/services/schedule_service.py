@@ -11,8 +11,9 @@ from ..schemas import RuleGroupView, ScheduleCreate, ScheduleView
 
 
 class ScheduleService:
-    def __init__(self, session: Session):
+    def __init__(self, session: Session, organization_id: int):
         self.session = session
+        self.organization_id = organization_id
 
     def list_rule_groups(self) -> List[RuleGroupView]:
         groups = self.session.exec(select(RuleGroup).order_by(RuleGroup.created_at.desc())).all()
@@ -37,7 +38,7 @@ class ScheduleService:
 
     def create_schedule(self, payload: ScheduleCreate) -> ScheduleView:
         group = self.session.get(RuleGroup, payload.group_id)
-        if not group:
+        if not group or group.organization_id != self.organization_id:
             raise ValueError("Rule group not found")
         interval = self._resolve_interval(payload)
         schedule = Schedule(
@@ -48,6 +49,7 @@ class ScheduleService:
             interval_minutes=interval,
             enabled=payload.enabled,
             next_run=datetime.utcnow() + timedelta(minutes=interval),
+            organization_id=self.organization_id,
         )
         self.session.add(schedule)
         self.session.commit()

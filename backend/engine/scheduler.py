@@ -8,6 +8,8 @@ from typing import Callable
 from sqlmodel import Session, select
 
 from app.models import RuleGroup, ScanJob, Schedule
+from app.security.audit import log_action
+from app.security.config import security_settings
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -41,11 +43,15 @@ class ScheduleManager:
         group = session.get(RuleGroup, schedule.group_id)
         if not group:
             return
+        if not self._group_has_capacity(session, group.id):
+            logger.debug("Skipping enqueue for group %s due to pending jobs", group.id)
+            return
         job = ScanJob(
             group_id=group.id,
             schedule_id=schedule.id,
             hostname=group.default_hostname,
             triggered_by=f"schedule:{schedule.id}",
+            organization_id=schedule.organization_id,
         )
         session.add(job)
         schedule.next_run = datetime.utcnow() + timedelta(minutes=max(schedule.interval_minutes or 60, 5))
@@ -54,9 +60,27 @@ class ScheduleManager:
         try:
             session.commit()
             logger.info("Queued scan job %s for group %s", job.id, group.name)
+            log_action(
+                action_type="SCAN_SANDBOX_EVENT",
+                resource_type="RULE_GROUP",
+                resource_id=group.id,
+                request=None,
+                user=None,
+                org=None,
+                metadata={"job_id": job.id, "trigger": "scheduler"},
+            )
         except Exception:
             session.rollback()
             logger.exception("Failed to enqueue scan job for schedule %s", schedule.id)
 
     async def stop(self) -> None:
         self._stopping = True
+
+    def _group_has_capacity(self, session: Session, group_id: int) -> bool:
+        pending_jobs = session.exec(
+            select(ScanJob).where(
+                ScanJob.group_id == group_id,
+                ScanJob.status.in_(["pending", "running"]),
+            )
+        ).all()
+        return len(pending_jobs) < security_settings.max_concurrent_jobs_per_org

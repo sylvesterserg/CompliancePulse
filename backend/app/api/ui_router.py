@@ -9,9 +9,10 @@ from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, func, select
 
 from ..config import settings
-from ..models import Benchmark, Report, Rule, Scan
-from ..schemas import ScanRequest
+from ..models import Benchmark, Report, Rule, RuleGroup, Scan, ScanJob, Schedule
+from ..schemas import ScanRequest, ScheduleCreate
 from ..services.scan_service import ScanService
+from ..services.schedule_service import ScheduleService
 from .deps import get_db_session
 
 router = APIRouter()
@@ -66,6 +67,40 @@ def _benchmarks(session: Session) -> List[Benchmark]:
     return session.exec(select(Benchmark).order_by(Benchmark.title)).all()
 
 
+def _rule_groups(session: Session) -> List[Dict[str, Any]]:
+    groups = session.exec(select(RuleGroup).order_by(RuleGroup.created_at.desc())).all()
+    data: List[Dict[str, Any]] = []
+    for group in groups:
+        next_schedule = (
+            session.exec(
+                select(Schedule)
+                .where((Schedule.group_id == group.id) & (Schedule.enabled == True))  # noqa: E712
+                .order_by(Schedule.next_run)
+            )
+            .first()
+        )
+        pending_jobs = session.exec(
+            select(func.count(ScanJob.id)).where(
+                (ScanJob.group_id == group.id) & (ScanJob.status == "pending")
+            )
+        ).one()
+        data.append(
+            {
+                "id": group.id,
+                "name": group.name,
+                "benchmark_id": group.benchmark_id,
+                "description": group.description,
+                "default_hostname": group.default_hostname,
+                "rule_count": len(json.loads(group.rule_ids_json or "[]")),
+                "last_run": group.last_run,
+                "next_run": next_schedule.next_run if next_schedule else None,
+                "pending_jobs": pending_jobs,
+                "tags": json.loads(group.tags_json or "[]"),
+            }
+        )
+    return data
+
+
 def _render_rules_table(request: Request, session: Session, modal_reset: bool = False) -> HTMLResponse:
     context = {"request": request, "rules": _rule_list(session), "modal_reset": modal_reset}
     return _templates().TemplateResponse("partials/rules_table.html", context)
@@ -78,6 +113,32 @@ def _render_scans_table(request: Request, scan_service: ScanService, modal_reset
         "modal_reset": modal_reset,
     }
     return _templates().TemplateResponse("partials/scans_table.html", context)
+
+
+def _render_rule_groups_panel(
+    request: Request,
+    session: Session,
+    message: str | None = None,
+) -> HTMLResponse:
+    context = {
+        "request": request,
+        "rule_groups": _rule_groups(session),
+        "message": message,
+    }
+    return _templates().TemplateResponse("partials/rule_groups.html", context)
+
+
+def _render_schedules_table(
+    request: Request,
+    schedule_service: ScheduleService,
+    modal_reset: bool = False,
+) -> HTMLResponse:
+    context = {
+        "request": request,
+        "schedules": schedule_service.list_schedules(),
+        "modal_reset": modal_reset,
+    }
+    return _templates().TemplateResponse("partials/schedules_table.html", context)
 
 
 def _render_reports_table(request: Request, scan_service: ScanService) -> HTMLResponse:
@@ -94,6 +155,7 @@ async def dashboard(
     session: Session = Depends(get_db_session),
 ) -> HTMLResponse:
     scan_service = ScanService(session)
+    schedule_service = ScheduleService(session)
     scans = scan_service.list_scans()
     reports = scan_service.list_reports()
     failed_scans = [scan for scan in scans if scan.result == "failed"][:5]
@@ -107,6 +169,9 @@ async def dashboard(
         "last_failed_scans": failed_scans,
         "compliance_score": compliance_score,
         "recent_reports": reports[:4],
+        "rule_groups": _rule_groups(session),
+        "schedules": schedule_service.list_schedules(),
+        "next_schedule": schedule_service.get_next_schedule(),
     }
     return _templates().TemplateResponse("dashboard.html", context)
 
@@ -231,6 +296,74 @@ async def trigger_scan(
     payload = ScanRequest(hostname=hostname, ip=ip or None, benchmark_id=benchmark_id, tags=tag_list)
     scan_service.start_scan(payload)
     return _render_scans_table(request, scan_service, modal_reset=True)
+
+
+@router.get("/automation/modal/schedule", response_class=HTMLResponse)
+async def schedule_modal(
+    request: Request,
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    schedule_service = ScheduleService(session)
+    context = {"request": request, "rule_groups": schedule_service.list_rule_groups()}
+    return _templates().TemplateResponse("modals/schedule_new.html", context)
+
+
+@router.post("/automation/schedules", response_class=HTMLResponse)
+async def create_schedule_from_modal(
+    request: Request,
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    form = await request.form()
+    name = str(form.get("name", "")).strip()
+    group_id = int(form.get("group_id", 0))
+    frequency = str(form.get("frequency", "daily")).strip() or "daily"
+    interval = form.get("interval_minutes")
+    interval_minutes = int(interval) if interval else None
+    if not name or not group_id:
+        raise HTTPException(status_code=400, detail="Name and group are required")
+    schedule_service = ScheduleService(session)
+    payload = ScheduleCreate(
+        name=name,
+        group_id=group_id,
+        frequency=frequency,
+        interval_minutes=interval_minutes,
+        enabled=True,
+    )
+    try:
+        schedule_service.create_schedule(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _render_schedules_table(request, schedule_service, modal_reset=True)
+
+
+@router.delete("/automation/schedules/{schedule_id}", response_class=HTMLResponse)
+async def delete_schedule_from_dashboard(
+    schedule_id: int,
+    request: Request,
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    schedule_service = ScheduleService(session)
+    try:
+        schedule_service.delete_schedule(schedule_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return _render_schedules_table(request, schedule_service)
+
+
+@router.post("/automation/groups/{group_id}/run", response_class=HTMLResponse)
+async def run_group_now(
+    group_id: int,
+    request: Request,
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    scan_service = ScanService(session)
+    try:
+        job = scan_service.enqueue_group_scan(group_id, triggered_by="ui")
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    group = session.get(RuleGroup, group_id)
+    message = f"Queued scan for {group.name if group else 'group'}"
+    return _render_rule_groups_panel(request, session, message=message)
 
 
 @router.get("/reports/{report_id}/view", response_class=HTMLResponse)

@@ -1,9 +1,21 @@
-from .domain import Benchmark, Report, Rule, RuleResult, Scan
+from .domain import (
+    Benchmark,
+    Report,
+    Rule,
+    RuleGroup,
+    Scan,
+    ScanJob,
+    ScanResult,
+    Schedule,
+)
 
 __all__ = [
     "Benchmark",
     "Report",
     "Rule",
-    "RuleResult",
+    "RuleGroup",
     "Scan",
+    "ScanJob",
+    "ScanResult",
+    "Schedule",
 ]

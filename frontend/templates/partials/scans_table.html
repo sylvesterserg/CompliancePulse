@@ -17,11 +17,16 @@
       <p class="text-sm text-slate-600">{{ scan.passed_rules }}/{{ scan.total_rules }} passing</p>
       <p class="text-xs text-slate-400">{{ scan.tags|join(', ') }}</p>
     </td>
+    <td class="px-4 py-3">
+      <p class="text-sm font-semibold text-slate-900">{{ '%.0f'|format(scan.compliance_score) }}%</p>
+      <p class="text-xs text-slate-400">{{ scan.summary or 'No summary yet' }}</p>
+    </td>
+    <td class="px-4 py-3 text-sm text-slate-600">{{ scan.triggered_by }}</td>
     <td class="px-4 py-3 text-right text-xs text-slate-500">{{ scan.completed_at.strftime('%b %d %H:%M') if scan.completed_at else 'Running' }}</td>
   </tr>
   {% else %}
   <tr>
-    <td colspan="4" class="px-4 py-6 text-center text-sm text-slate-500">No scans yet.</td>
+    <td colspan="6" class="px-4 py-6 text-center text-sm text-slate-500">No scans yet.</td>
   </tr>
   {% endfor %}
 </tbody>

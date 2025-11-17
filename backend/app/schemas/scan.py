@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -13,22 +13,26 @@ class ScanRequest(BaseModel):
     tags: List[str] = Field(default_factory=list)
 
 
-class RuleResultView(BaseModel):
+class ScanResultView(BaseModel):
     id: int
     rule_id: str
+    rule_title: str
+    severity: str
     status: str
     passed: bool
     stdout: Optional[str]
     stderr: Optional[str]
-    expectation_detail: Optional[str]
-    created_at: datetime
+    details: Dict[str, Any] = Field(default_factory=dict)
+    executed_at: datetime
     completed_at: Optional[datetime]
+    runtime_ms: Optional[int]
 
 
 class ScanSummary(BaseModel):
     id: int
     hostname: str
     benchmark_id: str
+    group_id: Optional[int]
     status: str
     result: str
     severity: str
@@ -37,13 +41,29 @@ class ScanSummary(BaseModel):
     last_run: Optional[datetime]
     total_rules: int
     passed_rules: int
+    compliance_score: float
+    summary: Optional[str]
+    triggered_by: str
     tags: List[str] = Field(default_factory=list)
     output_path: Optional[str] = None
 
 
 class ScanDetail(ScanSummary):
     ip: Optional[str]
-    results: List[RuleResultView]
+    results: List[ScanResultView]
+    ai_summary: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ScanJobView(BaseModel):
+    id: int
+    group_id: int
+    hostname: str
+    schedule_id: Optional[int]
+    triggered_by: str
+    status: str
+    created_at: datetime
+    started_at: Optional[datetime]
+    completed_at: Optional[datetime]
 
 
 class ReportView(BaseModel):
@@ -53,6 +73,8 @@ class ReportView(BaseModel):
     hostname: str
     score: float
     summary: str
+    key_findings: List[str] = Field(default_factory=list)
+    remediations: List[str] = Field(default_factory=list)
     status: str
     severity: str
     tags: List[str] = Field(default_factory=list)

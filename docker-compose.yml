@@ -2,6 +2,7 @@ version: "3.9"
 
 services:
   api:
+    image: compliancepulse-backend
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -23,6 +24,40 @@ services:
       timeout: 3s
       retries: 3
       start_period: 10s
+
+  worker:
+    image: compliancepulse-backend
+    container_name: compliancepulse-worker
+    command: ["python", "worker.py"]
+    environment:
+      - DB_URL=sqlite:////app/data/compliancepulse.db
+      - ENVIRONMENT=development
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./frontend/templates:/app/frontend/templates
+      - ./frontend/static:/app/frontend/static
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  scheduler:
+    image: compliancepulse-backend
+    container_name: compliancepulse-scheduler
+    command: ["python", "scheduler_service.py"]
+    environment:
+      - DB_URL=sqlite:////app/data/compliancepulse.db
+      - ENVIRONMENT=development
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./frontend/templates:/app/frontend/templates
+      - ./frontend/static:/app/frontend/static
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
 
   tailwind:
     image: node:20-alpine

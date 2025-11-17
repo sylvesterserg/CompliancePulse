@@ -1,0 +1,17 @@
+[Unit]
+Description=CompliancePulse Scan Worker
+After=network.target
+Requires=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/compliancepulse/backend
+Environment=PYTHONPATH=/opt/compliancepulse/backend
+ExecStart=/usr/bin/python3 /opt/compliancepulse/backend/worker.py
+Restart=always
+RestartSec=5
+User=compliance
+Group=compliance
+
+[Install]
+WantedBy=multi-user.target

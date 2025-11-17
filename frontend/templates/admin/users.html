@@ -1,0 +1,63 @@
+{% extends "admin/layout.html" %}
+
+{% block content %}
+<div class="mb-8">
+  <h2 class="text-2xl font-semibold text-white">Users</h2>
+  <p class="text-sm text-slate-400">Cross-tenant roster with organization memberships and controls.</p>
+</div>
+
+<div class="space-y-4">
+  {% for user in users %}
+  <div class="rounded-xl border border-slate-800 bg-slate-900/50 p-5">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <p class="text-lg font-semibold text-white">{{ user.full_name }}</p>
+        <p class="text-sm text-slate-400">{{ user.email }}</p>
+        <div class="mt-1 flex gap-2 text-xs">
+          {% if user.super_admin %}<span class="rounded-full bg-emerald-500/20 px-2 py-0.5 font-semibold text-emerald-200">Super Admin</span>{% endif %}
+          {% if user.is_locked %}<span class="rounded-full bg-rose-500/20 px-2 py-0.5 font-semibold text-rose-200">Locked</span>{% endif %}
+          {% if user.require_password_reset %}<span class="rounded-full bg-amber-500/20 px-2 py-0.5 font-semibold text-amber-200">Reset Required</span>{% endif %}
+        </div>
+      </div>
+      <div class="flex gap-2">
+        {% if not user.is_locked %}
+        <form method="post" action="/admin/users/{{ user.id }}/lock">
+          <button class="rounded-md bg-rose-500/20 px-3 py-2 text-xs font-semibold text-rose-200 hover:bg-rose-500/40">Lock</button>
+        </form>
+        {% else %}
+        <form method="post" action="/admin/users/{{ user.id }}/unlock">
+          <button class="rounded-md bg-emerald-500/20 px-3 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/40">Unlock</button>
+        </form>
+        {% endif %}
+        <form method="post" action="/admin/users/{{ user.id }}/force-reset">
+          <button class="rounded-md bg-slate-800 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-700">Force Reset</button>
+        </form>
+      </div>
+    </div>
+    <div class="mt-4 grid gap-4 md:grid-cols-2">
+      <div>
+        <p class="text-xs uppercase tracking-wide text-slate-500">Organizations</p>
+        <ul class="mt-2 space-y-1 text-sm text-slate-300">
+          {% for org in user.organizations %}
+          <li class="flex items-center justify-between rounded-md bg-slate-800/70 px-3 py-2">
+            <span>{{ org.name }}</span>
+            <span class="text-xs uppercase tracking-widest text-slate-400">{{ org.role }}</span>
+          </li>
+          {% else %}
+          <li class="text-xs text-slate-500">No memberships</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div>
+        <p class="text-xs uppercase tracking-wide text-slate-500">Security</p>
+        <p class="text-sm text-slate-400">Password Token: {{ user.password_reset_token or 'n/a' }}</p>
+        <p class="text-sm text-slate-400">Last Login: {{ user.last_login_at.strftime('%Y-%m-%d %H:%M') if user.last_login_at else 'never' }}</p>
+        <p class="text-sm text-slate-400">Created: {{ user.created_at.strftime('%Y-%m-%d') }}</p>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <p class="text-slate-500">No users provisioned.</p>
+  {% endfor %}
+</div>
+{% endblock %}

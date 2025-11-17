@@ -1,0 +1,48 @@
+{% extends "admin/layout.html" %}
+
+{% block content %}
+<div class="mb-8">
+  <h2 class="text-2xl font-semibold text-white">Feature Flags</h2>
+  <p class="text-sm text-slate-400">Toggle experimental capabilities across the platform.</p>
+</div>
+
+<div class="grid gap-6 lg:grid-cols-3">
+  <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-5 lg:col-span-2">
+    <div class="space-y-3">
+      {% for flag in flags %}
+      <div class="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/70 px-4 py-3">
+        <div>
+          <p class="text-white font-semibold">{{ flag.key }}</p>
+          <p class="text-xs text-slate-400">{{ flag.description }}</p>
+        </div>
+        <form method="post" action="/admin/flags/{{ flag.id }}/toggle">
+          <button class="rounded-md px-3 py-2 text-xs font-semibold {% if flag.enabled %}bg-emerald-500/30 text-emerald-100 hover:bg-emerald-500/50{% else %}bg-slate-800 text-slate-200 hover:bg-slate-700{% endif %}">
+            {% if flag.enabled %}Disable{% else %}Enable{% endif %}
+          </button>
+        </form>
+      </div>
+      {% else %}
+      <p class="text-slate-500">No feature flags defined.</p>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+    <h3 class="text-lg font-semibold text-white">Create Flag</h3>
+    <form method="post" action="/admin/flags" class="mt-4 space-y-3">
+      <div>
+        <label class="text-xs uppercase tracking-wide text-slate-500">Key</label>
+        <input name="key" class="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm" required />
+      </div>
+      <div>
+        <label class="text-xs uppercase tracking-wide text-slate-500">Description</label>
+        <textarea name="description" class="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm"></textarea>
+      </div>
+      <label class="inline-flex items-center gap-2 text-sm text-slate-300">
+        <input type="checkbox" name="enabled" class="rounded border-slate-700 bg-slate-900" />
+        Enabled
+      </label>
+      <button class="w-full rounded-md bg-emerald-500/30 px-3 py-2 text-sm font-semibold text-emerald-100 hover:bg-emerald-500/50">Create</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

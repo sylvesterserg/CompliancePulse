@@ -7,10 +7,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 
+from .admin.router import router as admin_router
 from .api import benchmarks, reports, rules, scans, schedules, ui_router
 from .config import settings
 from .database import engine, init_db
 from .models import Benchmark
+from .migrations import run_migrations
 from .services.benchmark_loader import PulseBenchmarkLoader
 from .seed import seed_dev_data
 
@@ -35,11 +37,13 @@ app.include_router(scans.router)
 app.include_router(reports.router)
 app.include_router(schedules.router)
 app.include_router(ui_router.router)
+app.include_router(admin_router)
 
 
 @app.on_event("startup")
 def startup_event() -> None:
     init_db()
+    run_migrations(engine)
     loader = PulseBenchmarkLoader()
     for path in (
         settings.benchmark_dir,

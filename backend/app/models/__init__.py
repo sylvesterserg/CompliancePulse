@@ -1,5 +1,9 @@
 from .domain import (
     Benchmark,
+    FeatureFlag,
+    Organization,
+    OrganizationMembership,
+    PlatformLog,
     Report,
     Rule,
     RuleGroup,
@@ -7,10 +11,16 @@ from .domain import (
     ScanJob,
     ScanResult,
     Schedule,
+    User,
+    WorkerStatus,
 )
 
 __all__ = [
     "Benchmark",
+    "FeatureFlag",
+    "Organization",
+    "OrganizationMembership",
+    "PlatformLog",
     "Report",
     "Rule",
     "RuleGroup",
@@ -18,4 +28,6 @@ __all__ = [
     "ScanJob",
     "ScanResult",
     "Schedule",
+    "User",
+    "WorkerStatus",
 ]

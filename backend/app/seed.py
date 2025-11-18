@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timedelta
 
 from sqlmodel import Session, select
+import os
 
 from .auth.utils import hash_password
 from .config import settings
@@ -181,3 +182,51 @@ def seed_dev_data(session: Session) -> None:
     session.add(report_success)
     session.add(report_failed)
     session.commit()
+
+
+def seed_bootstrap_admin(session: Session) -> None:
+    """Optionally create an initial admin in non-development environments.
+
+    Controlled by environment variables:
+      - ADMIN_EMAIL
+      - ADMIN_PASSWORD
+      - ADMIN_ORG_NAME (default: "Default Organization")
+    """
+    admin_email = os.getenv("ADMIN_EMAIL")
+    admin_password = os.getenv("ADMIN_PASSWORD")
+    if not admin_email or not admin_password:
+        return
+
+    existing_user = session.exec(select(User).where(User.email == admin_email.lower())).first()
+    if existing_user:
+        return
+
+    org_name = os.getenv("ADMIN_ORG_NAME", "Default Organization").strip() or "Default Organization"
+    slug = org_name.lower().replace(" ", "-")
+    organization = session.exec(select(Organization).where(Organization.slug == slug)).first()
+    if not organization:
+        organization = Organization(name=org_name, slug=slug)
+        session.add(organization)
+        session.commit()
+        session.refresh(organization)
+
+    user = User(
+        email=admin_email.lower(),
+        hashed_password=hash_password(admin_password),
+        is_verified=True,
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+
+    membership = UserOrganization(
+        user_id=user.id,
+        organization_id=organization.id,
+        role=MembershipRole.OWNER,
+    )
+    session.add(membership)
+    session.commit()
+
+    # Load baseline content
+    loader = PulseBenchmarkLoader()
+    loader.load_all(session, organization.id)

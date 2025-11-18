@@ -21,7 +21,7 @@ from .models import Benchmark
 from .security.config import security_settings
 from .security.utils import get_client_context
 from .services.benchmark_loader import PulseBenchmarkLoader
-from .seed import seed_dev_data
+from .seed import seed_dev_data, seed_bootstrap_admin
 
 app = FastAPI(title=settings.app_name, version=settings.version, description="Compliance scanning service for Rocky Linux")
 
@@ -152,6 +152,7 @@ def startup_event() -> None:
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     with Session(engine) as session:
         seed_dev_data(session)
+        seed_bootstrap_admin(session)
 
 
 @app.get("/api")

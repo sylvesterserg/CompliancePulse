@@ -65,7 +65,8 @@ class Settings(BaseModel):
             values["frontend_template_dir"] = Path(frontend_templates)
         if frontend_static:
             values["frontend_static_dir"] = Path(frontend_static)
-        session_secret = os.getenv("SESSION_SECRET")
+        # Support both SESSION_SECRET and SESSION_SECRET_KEY (used by security settings)
+        session_secret = os.getenv("SESSION_SECRET") or os.getenv("SESSION_SECRET_KEY")
         if session_secret:
             values["session_secret"] = session_secret
         cookie_name = os.getenv("SESSION_COOKIE_NAME")
@@ -86,6 +87,10 @@ class Settings(BaseModel):
         csrf_header = os.getenv("CSRF_HEADER_NAME")
         if csrf_header:
             values["csrf_header_name"] = csrf_header
+        # Optional CORS origins configuration
+        allowed_origins = os.getenv("ALLOWED_ORIGINS")
+        if allowed_origins:
+            values["allow_origins"] = [x.strip() for x in allowed_origins.split(",") if x.strip()]
         return cls(**values)
 
 

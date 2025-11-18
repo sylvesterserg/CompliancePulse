@@ -65,6 +65,13 @@ curl -sf http://localhost/api/health | grep -q '"healthy"' || {
   exit 1
 }
 
+echo "[ui] Checking UI login route returns 200"
+code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/auth/login)
+[ "$code" = "200" ] || {
+  echo "[fail] /auth/login returned $code (expected 200)" >&2
+  exit 1
+}
+
 echo "[auth] Validating UI login form action points to /api/auth/login"
 curl -sf http://localhost/auth/login | grep -q '<form[^>]*action="/api/auth/login"' || {
   echo "[fail] UI login form action not pointing to /api/auth/login" >&2
@@ -102,6 +109,25 @@ printf "%s" "$AUTH_RESP" | tr -d '\r' | grep -qi "^location: /" || {
 printf "%s" "$AUTH_RESP" | grep -qi "^set-cookie: .*cp_session=" || {
   echo "[fail] API login did not set session cookie" >&2
   printf "%s\n" "$AUTH_RESP" >&2
+  exit 1
+}
+
+echo "[assets] Verifying static assets are served"
+curl -sI http://localhost/static/css/app.css | head -n1 | grep -q " 200 " || {
+  echo "[fail] Static CSS not served correctly" >&2
+  exit 1
+}
+
+echo "[ui] Fetching dashboard with session cookie (should be HTML, 200)"
+curl -s -b "$JAR" -D /tmp/dash_headers.txt -o /tmp/dash_body.html http://localhost/dashboard >/dev/null
+head -n1 /tmp/dash_headers.txt | grep -q " 200 " || {
+  echo "[fail] /dashboard did not return HTTP 200" >&2
+  cat /tmp/dash_headers.txt >&2 || true
+  exit 1
+}
+grep -q "<!DOCTYPE html>" /tmp/dash_body.html || {
+  echo "[fail] /dashboard did not return HTML content" >&2
+  head -n 20 /tmp/dash_body.html >&2 || true
   exit 1
 }
 

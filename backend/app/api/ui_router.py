@@ -345,6 +345,15 @@ async def dashboard(
     return _templates().TemplateResponse("dashboard.html", context)
 
 
+@router.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_alias(
+    request: Request,
+    session: Session = Depends(get_session),
+) -> Response:
+    # Serve the same dashboard content at /dashboard for UX/tests
+    return await dashboard(request, session)  # type: ignore[arg-type]
+
+
 @router.get("/rules", response_class=HTMLResponse)
 async def rules_page(
     request: Request,

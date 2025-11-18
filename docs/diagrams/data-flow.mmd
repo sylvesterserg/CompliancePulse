@@ -1,0 +1,21 @@
+%% Mermaid: Data Flow
+sequenceDiagram
+  participant User
+  participant API
+  participant Service as Service Layer
+  participant Engine as ScanExecutor/RuleEngine
+  participant DB as SQLite
+  participant Files as Artifacts/Logs
+
+  User->>API: POST /scans {hostname, benchmark_id}
+  API->>Service: start_scan(payload)
+  Service->>DB: SELECT rules for benchmark
+  Service->>Engine: run_for_rules(...)
+  Engine->>DB: INSERT scan
+  Engine->>Engine: evaluate each rule (RuleEngine)
+  Engine->>DB: INSERT scan_results
+  Engine->>DB: INSERT report
+  Engine->>Files: write JSON artifacts
+  Engine->>DB: UPDATE scan output_path
+  Service-->>API: ScanDetail
+

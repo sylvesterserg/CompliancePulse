@@ -1,0 +1,34 @@
+%% Mermaid: High-level Architecture
+flowchart LR
+  subgraph Client
+    Browser[Browser (HTMX)]
+    Agent[CLI Agent]
+  end
+
+  subgraph Backend[FastAPI Backend]
+    API[FastAPI Routers]
+    UI[Jinja2 Templates]
+    Services[Services Layer]
+    Engine[Engine (RuleEngine/ScanExecutor)]
+    DB[(SQLite)]
+    Artifacts[(Artifacts/Logs)]
+  end
+
+  subgraph Workers
+    Scheduler[ScheduleManager]
+    Worker[Worker]
+    Queue[(ScanJob Table)]
+  end
+
+  Browser -->|HTML/JSON| API
+  Agent -->|JSON API| API
+  API --> UI
+  API --> Services
+  Services --> Engine
+  Services <--> DB
+  Engine --> Artifacts
+  Scheduler -->|enqueue| Queue
+  Worker -->|claim/complete| Queue
+  Worker -->|execute| Engine
+  Worker --> DB
+

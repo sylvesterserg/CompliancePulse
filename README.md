@@ -2,158 +2,115 @@
 
 Security compliance monitoring and scanning platform for Rocky Linux systems.
 
-## Quick Start
+Version: 0.6.0
 
-```bash
-# Compile Tailwind assets once (optional in dev)
-docker compose --profile assets run --rm tailwind
+This repository contains a FastAPI backend with an HTMX/Tailwind-powered UI, a simple scanning agent for demo/dev, and worker/scheduler services for executing and scheduling compliance scans. Multi‑tenant isolation and API keys are built in. Docs and diagrams live under `docs/`.
 
-# Start services
-docker compose up -d --build
+**Overview**
+- Multi-tenant compliance scanning with benchmark-driven rules (YAML)
+- FastAPI backend with JSON + HTML responses (UI routes provide JSON fallbacks for tests/automation)
+- Worker + Scheduler for asynchronous, rate-limited execution
+- SQLite by default; paths configurable via environment
+- Secure session middleware, CSRF, API keys, rate limiting, audit logs
 
-# Optional: launch Redis-backed rate limiting in the future
-docker compose --profile rate-limit up -d redis
+**Features**
+- Benchmarks: load/validate YAML benchmarks into SQLModel
+- Scans: run rules via a guarded shell rule engine; persist artifacts
+- Reports: compute weighted compliance scores and summaries
+- Scheduling: rule groups + schedules + queueing via jobs
+- Security: API keys, rate limiting, audit log, command allow-list
+- UI: dashboard, rules, scans, reports with HTMX interactions
 
-# View logs
-docker compose logs -f api
+**Architecture Summary**
+- Backend (FastAPI, SQLModel) under `backend/app`
+- Engine (rule engine, executor, scheduler) under `backend/engine`
+- Frontend templates + static assets under `frontend/`
+- Worker `backend/worker.py` and scheduler `backend/engine/jobs.py`
+- Tests in `tests/` and `backend/tests/`
 
-# Stop services
-docker compose down
-```
+See `docs/architecture.md` and diagrams under `docs/diagrams/`.
 
-## Access Points
+**Folder Structure**
+- `backend/app`: API, models, schemas, services, security, config
+- `backend/engine`: rule engine, executor, scheduler loop
+- `frontend`: Jinja2 templates and static assets (HTMX, Tailwind)
+- `agent`: example scanning agent
+- `tests`, `backend/tests`: pytest suites
+- `deploy`: systemd unit files
 
-- **Dashboard + API**: http://localhost:8000
-- **Backend API**: http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs
+**Technology Stack**
+- Python 3.11, FastAPI, Starlette, SQLModel/SQLAlchemy
+- SQLite (default), optional Redis for rate limiting
+- Tailwind CSS, HTMX, Jinja2 templates
+- Docker Compose / Podman
 
-## Development
+**How To Run**
+- Local (Python)
+  - `cd backend && pip install -r requirements.txt`
+  - `npm install && npm run build:css` (compile Tailwind to `frontend/static/css/app.css`)
+  - `cd backend && uvicorn app.main:app --reload`
+  - Open `http://localhost:8000`
+- Docker (Compose)
+  - `docker compose --profile assets run --rm tailwind` (one-time CSS build)
+  - `docker compose up -d --build`
+  - Logs: `docker compose logs -f api`
+  - Stop: `docker compose down`
+- Production (Podman example)
+  - Build: `podman build -t compliancepulse -f backend/Dockerfile .`
+  - Run: `podman run -d -p 8000:8000 -e DB_URL=sqlite:////app/data/compliancepulse.db -e ENVIRONMENT=production -v ./data:/app/data:Z -v ./logs:/app/logs:Z compliancepulse`
+  - For SELinux: `chcon -Rt svirt_sandbox_file_t ./data ./logs ./frontend`
 
-```bash
-# Install Python deps
-cd backend && pip install -r requirements.txt
+Environment variables (see `docker-compose.yml`):
+- `DB_URL`, `ENVIRONMENT`, `SESSION_SECRET_KEY`, `API_KEY_HASH_SALT`, `STRIPE_WEBHOOK_SECRET`
+- `ALLOWED_COMMANDS`, `MAX_SCAN_RUNTIME_PER_JOB`, `MAX_CONCURRENT_JOBS_PER_ORG`
+- `API_KEY_RATE_LIMIT`, `API_KEY_RATE_WINDOW_SECONDS`, `AUDIT_LOG_RETENTION_DAYS`, `SECURITY_TEST_MODE`
 
-# Run Tailwind build locally
-npm install
-npm run build:css
+**Testing Instructions**
+- Install dev deps as above
+- Run tests: `pytest -q`
+- Useful markers: `-m integration`, `-m worker`, `-m smoke`, `-m slow`, `-m acl`
+- See `docs/tests.md` for fixtures, ASGI test client, and tips
 
-# Launch API with auto reload
-cd backend && uvicorn app.main:app --reload
+**Developer Workflows**
+- API/UI changes: update `backend/app/api/*` and templates, run `npm run build:css`
+- Benchmarks: edit YAML files under `backend/benchmarks/`, then `POST /benchmarks/reload`
+- Background jobs: run `python backend/worker.py` and `python backend/scheduler_service.py`
+- Security settings: tune via env, see section below and `backend/app/security/*`
 
-# Run agent locally
-cd agent
-python3 scan_agent.py <hostname> [ip]
+**CLI Commands**
+- API (dev): `uvicorn app.main:app --reload`
+- Worker: `python backend/worker.py`
+- Scheduler: `python backend/scheduler_service.py`
+- Agent: `python agent/scan_agent.py <hostname> [ip]`
+- Tailwind: `npm run build:css`
 
-# Check service health
-curl http://localhost:8000/health
-```
+**Versioning**
+- Semantic Versioning (SemVer). Current API version: `0.6.0` (see `backend/app/config.py`).
+- Release notes for the next `0.7.0` are in `RELEASE_NOTES_v0.7.0.md`.
 
-## Architecture
+**Future Roadmap**
+- PostgreSQL support + migrations
+- Real remote agent with secure transport and attestation
+- Web UI enhancements: live scan streaming, advanced filters
+- RBAC improvements and audit log export
+- S3-compatible artifact storage, signed URLs
+- OpenAPI examples + client SDKs
 
-- **Backend**: FastAPI + SQLModel (Python 3.11)
-- **Frontend**: FastAPI templates + HTMX-lite interactions
-- **Database**: SQLite (persistent volume)
-- **Agent**: Python scanning script
-- **Security Controls**: Audit logging + rate limiting + API keys (Phase 0.9)
+**Security + Observability**
+- Middleware: request logging with IP/latency, JSON body mirroring in test mode, cookie-based sessions
+- Audit log events on scans, scheduler, worker failures
+- Rate limiting (memory; Redis-ready) and API key management
+- Command allowlist for shell execution (`ALLOWED_COMMANDS`)
 
-## Security + Observability Controls
+**API Keys**
+- `GET /settings/api-keys` – list
+- `POST /settings/api-keys/create` – create (returns plaintext once)
+- `GET /settings/api-keys/{id}/show` – show
+- `POST /settings/api-keys/{id}/revoke` – revoke
+Auth via `Authorization: Bearer <token>` or `X-API-Key`.
 
-- Centralized `AuditLog` table captures auth, scan, scheduler, and API key events.
-- Request-level logging middleware with IP + latency traces.
-- Built-in rate limiting primitives (default in-memory, Redis-ready).
-- Organization-scoped API keys with prefix-based storage and secure hashing.
-- Worker/scheduler guardrails for sandboxed rule execution and runtime capping.
-- Configurable allowed command whitelist (`ALLOWED_COMMANDS`) for the rule engine.
+**Diagrams & Docs**
+- Architecture, services, data flow, and API routing diagrams in `docs/diagrams/`
+- Developer docs under `docs/`
 
-### Security Environment Variables
-
-Set the following (already defined with dev-safe defaults in `docker-compose.yml`):
-
-| Variable | Purpose |
-| --- | --- |
-| `SESSION_SECRET_KEY` | Session / CSRF signing key. |
-| `API_KEY_HASH_SALT` | Salt for API key hashing. |
-| `STRIPE_WEBHOOK_SECRET` | Secret for Stripe webhook validation. |
-| `ALLOWED_COMMANDS` | Comma-separated whitelist for rule engine commands. |
-| `MAX_SCAN_RUNTIME_PER_JOB` | Seconds before sandboxed scans are force-failed. |
-| `MAX_CONCURRENT_JOBS_PER_ORG` | Concurrency guardrail for the worker/scheduler. |
-| `API_KEY_RATE_LIMIT` / `API_KEY_RATE_WINDOW_SECONDS` | API key usage caps. |
-| `AUDIT_LOG_RETENTION_DAYS` | Controls downstream log retention policies. |
-| `SECURITY_TEST_MODE` | Enables in-memory stores for test harnesses. |
-
-### API Keys
-
-Manage programmatic access via:
-
-- `GET /settings/api-keys` – list keys.
-- `POST /settings/api-keys/create` – issue a new key (plaintext returned once).
-- `GET /settings/api-keys/{id}/show` – inspect metadata for a key.
-- `POST /settings/api-keys/{id}/revoke` – deactivate a key.
-
-Keys authenticate via `Authorization: Bearer <token>` or `X-API-Key`.
-
-## Data Persistence
-
-- Database: `./data/compliancepulse.db`
-- Logs: `./logs/`
-
-## Tailwind Build Pipeline
-
-1. Update templates or `frontend/static/css/tailwind.css`.
-2. Run `npm install` once to pull the toolchain.
-3. Compile: `npm run build:css` (outputs `frontend/static/css/app.css`).
-4. `docker compose --profile assets run --rm tailwind` mirrors the same workflow in containers.
-
-## Phase 0.4 Highlights
-
-✓ FastAPI-driven UI router with Tailwind layout
-✓ HTMX-powered modals for rule creation, scan triggers, and report viewers
-✓ Expanded models (tags, severity, statuses, artifact tracking)
-✓ Multi-stage Docker build with Tailwind compilation
-✓ Rocky Linux-focused deployment guidance
-
-## Troubleshooting
-
-```bash
-# Check container status
-docker compose ps
-
-# View all logs
-docker compose logs
-
-# Restart services
-docker compose restart
-
-# Clean rebuild
-docker compose down && docker compose up -d --build
-
-# Check firewall
-sudo firewall-cmd --list-ports
-```
-
-## Support
-
-For issues or questions, check `/var/log/compliancepulse-install.log`
-
-## Rocky Linux Deployment (Podman)
-
-```bash
-# Build the multi-stage image
-podman build -t compliancepulse -f backend/Dockerfile .
-
-# Run API container with SELinux-aware volumes
-podman run -d --name compliancepulse \
-  -p 8000:8000 \
-  -e DB_URL=sqlite:////app/data/compliancepulse.db \
-  -e ENVIRONMENT=production \
-  -v ./data:/app/data:Z \
-  -v ./logs:/app/logs:Z \
-  compliancepulse
-
-# Optional Tailwind build inside Podman Compose
-podman-compose --profile assets run --rm tailwind
-podman-compose up -d
-
-# SELinux tips
-sudo chcon -Rt svirt_sandbox_file_t ./data ./logs ./frontend
-```
+For a full API list and usage, see `docs/api.md`.

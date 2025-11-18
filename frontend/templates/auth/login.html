@@ -17,7 +17,7 @@
         {% if error is string %}{{ error }}{% else %}Please verify the submitted form.{% endif %}
       </div>
       {% endif %}
-      <form method="post" class="space-y-4">
+      <form method="post" action="/api/auth/login" class="space-y-4">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
         <label class="block text-sm font-semibold text-slate-600">
           Email
@@ -45,7 +45,7 @@
       </form>
       <p class="mt-6 text-center text-sm text-slate-500">
         Don't have an account?
-        <a href="/auth/register" class="font-semibold text-indigo-600">Create one</a>
+        <a href="/api/auth/register" class="font-semibold text-indigo-600">Create one</a>
       </p>
     </div>
   </body>

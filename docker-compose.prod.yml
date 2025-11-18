@@ -9,7 +9,6 @@ networks:
 volumes:
   cp_data:
   cp_logs:
-  nginx_ssl:
 
 services:
   api:
@@ -109,14 +108,12 @@ services:
         condition: service_healthy
     ports:
       - "80:80"
-      - "443:443"
     volumes:
       - ./deployment/nginx/compliancepulse.conf:/etc/nginx/conf.d/compliancepulse.conf:ro
-      - nginx_ssl:/etc/nginx/ssl
       - cp_logs:/var/log/nginx
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost/health"]
       interval: 30s
       timeout: 5s
       retries: 3

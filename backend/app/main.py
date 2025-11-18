@@ -128,9 +128,25 @@ async def log_requests(request: Request, call_next):
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     import json as _json
-    if exc.status_code == 401:
+    # Prefer redirect for interactive browser flows on non-API routes
+    path = request.url.path or ""
+    accept = (request.headers.get("accept") or "").lower()
+    is_api_path = path.startswith("/api/")
+    is_ajax = (
+        request.headers.get("x-requested-with", "").lower() == "xmlhttprequest"
+        or request.headers.get("hx-request", "") == "true"
+    )
+    explicit_json = "application/json" in accept or request.headers.get("x-test-json") == "1"
+    wants_json = is_api_path or is_ajax or explicit_json
+
+    if exc.status_code in (401, 403) and not is_api_path and not is_ajax:
+        # Bounce to login page for unauthenticated or CSRF issues in the UI
+        return RedirectResponse(url="/auth/login", status_code=303)
+
+    if exc.status_code == 401 and wants_json:
         payload = {"error": "unauthorized", "status": 401}
         return JSONResponse(payload, status_code=401, headers={"x-test-json-body": _json.dumps(payload)})
+
     payload = {"detail": exc.detail, "status": exc.status_code}
     return JSONResponse(payload, status_code=exc.status_code, headers={"x-test-json-body": _json.dumps(payload)})
 

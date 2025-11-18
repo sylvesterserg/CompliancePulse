@@ -143,13 +143,17 @@ def _redirect_to_login() -> RedirectResponse:
 
 
 def _wants_json(request: Request) -> bool:
+    """Only emit JSON for UI routes when explicitly requested.
+
+    Many browsers/extensions include application/json in Accept. Prefer HTML
+    if text/html is present. Allow tests to force JSON via X-Test-Json header.
+    """
     accept = (request.headers.get("accept") or "").lower()
-    if "application/json" in accept:
-        return True
-    # Testing helper header
     if request.headers.get("x-test-json") == "1":
         return True
-    return False
+    if "text/html" in accept:
+        return False
+    return "application/json" in accept
 
 
 def _base_context(

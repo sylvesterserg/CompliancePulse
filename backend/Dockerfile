@@ -9,6 +9,7 @@ FROM python:3.11-slim AS runtime
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH="/app:/app/backend:${PYTHONPATH}"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
@@ -18,6 +19,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy entire backend tree to preserve module paths
+COPY backend /app/backend
+
+# Keep top-level convenience paths for existing entrypoint commands
 COPY backend/app ./app
 COPY backend/engine ./engine
 COPY backend/main.py ./main.py

@@ -51,6 +51,8 @@ if command -v ${ENGINE} >/dev/null 2>&1; then
   if [[ -f deployment/nginx/compliancepulse.conf ]]; then
     echo "[lint] Validating nginx config syntax"
     ${ENGINE} run --rm \
+      --add-host=api:127.0.0.1 \
+      --add-host=compliancepulse-api:127.0.0.1 \
       -v "${ROOT_DIR}/deployment/nginx/compliancepulse.conf:/etc/nginx/conf.d/compliancepulse.conf:ro" \
       nginx:1.27-alpine nginx -t || {
         echo "[lint] Nginx config validation failed" >&2; exit 1; }

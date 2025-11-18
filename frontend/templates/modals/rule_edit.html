@@ -4,10 +4,13 @@
       <h2 class="text-lg font-semibold text-slate-900">Edit Rule</h2>
       <button class="text-slate-400 hover:text-slate-600" onclick="document.getElementById('modal-root').innerHTML=''">✕</button>
     </div>
+    {% if error %}
+    <div class="mt-3 rounded-md bg-rose-50 p-3 text-sm text-rose-700">{{ error }}</div>
+    {% endif %}
     <form
       class="mt-4 space-y-4"
       method="post"
-      hx-post="/rules/{{ rule.id }}/update"
+      hx-post="/api/rules/{{ rule.id }}/update"
       hx-target="#rules-table"
       hx-swap="outerHTML"
     >
@@ -31,6 +34,10 @@
         <input name="title" value="{{ rule.title }}" class="mt-1 w-full rounded-lg border-slate-200" required />
       </label>
       <div class="grid gap-4 md:grid-cols-2">
+        <label class="text-sm font-medium text-slate-600">
+          Category
+          <input name="category" value="" class="mt-1 w-full rounded-lg border-slate-200" />
+        </label>
         <label class="text-sm font-medium text-slate-600">
           Severity
           <select name="severity" class="mt-1 w-full rounded-lg border-slate-200">
@@ -62,6 +69,10 @@
           <input name="expect_value" value="{{ rule.expect_value }}" class="mt-1 w-full rounded-lg border-slate-200" />
         </label>
       </div>
+      <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-600">
+        <input type="checkbox" name="enabled" {% if rule.status == 'active' %}checked{% endif %} class="h-4 w-4 rounded border-slate-300" />
+        Enabled
+      </label>
       <div class="flex justify-end gap-3">
         <button type="button" class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600" onclick="document.getElementById('modal-root').innerHTML=''">Cancel</button>
         <button type="submit" class="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white">Save Changes</button>

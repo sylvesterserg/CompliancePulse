@@ -1,0 +1,21 @@
+<div class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4">
+  <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-slate-900">Delete Rule</h2>
+      <button class="text-slate-400 hover:text-slate-600" onclick="document.getElementById('modal-root').innerHTML=''">✕</button>
+    </div>
+    <p class="mt-4 text-sm text-slate-600">Are you sure you want to delete rule <span class="font-semibold">{{ rule.title }}</span> (<code class="text-xs">{{ rule.id }}</code>)? This action cannot be undone.</p>
+    <form
+      class="mt-6 flex justify-end gap-3"
+      method="post"
+      hx-post="/api/rules/{{ rule.id }}/delete"
+      hx-target="#rules-table"
+      hx-swap="outerHTML"
+    >
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <button type="button" class="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600" onclick="document.getElementById('modal-root').innerHTML=''">Cancel</button>
+      <button type="submit" class="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white">Delete</button>
+    </form>
+  </div>
+</div>
+

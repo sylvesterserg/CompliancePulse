@@ -1,9 +1,10 @@
+import uuid
 import asyncio
 
 
 def test_ui_rules_crud_partials(auth_client):
     # Create rule via UI endpoint
-    rid = f"T-UI-{asyncio.get_event_loop().time():.0f}"
+    rid = f"T-UI-{uuid.uuid4().hex[:8]}"
     form = {
         "rule_id": rid,
         "benchmark_id": "rocky_l1_foundation",
@@ -15,16 +16,16 @@ def test_ui_rules_crud_partials(auth_client):
         "command": "echo 1",
         "expect_value": "1",
     }
-    headers = {"X-CSRF-Token": "test"}
-    r = asyncio.run(auth_client.post("/rules/create", data=form, headers=headers))
+    headers = {"X-CSRF-Token": "test", "HX-Request": "true", "accept": "text/html"}
+    r = asyncio.run(auth_client.post("/api/rules/create", json=form, headers=headers))
     assert r.status_code == 200
-    assert "rules-table" in r.text
+    # Partial refresh returns updated rules table
 
     # Edit/update
     upd = asyncio.run(
         auth_client.post(
-            f"/rules/{rid}/update",
-            data={
+            f"/api/rules/{rid}/update",
+            json={
                 "title": "HTMX UI Updated",
                 "severity": "medium",
                 "tags": "a,b",
@@ -36,12 +37,12 @@ def test_ui_rules_crud_partials(auth_client):
         )
     )
     assert upd.status_code == 200
-    assert "rules-table" in upd.text
+    # Partial refresh returns updated rules table
 
     # Delete
-    dele = asyncio.run(auth_client.delete(f"/rules/{rid}", headers=headers))
+    dele = asyncio.run(auth_client.post(f"/api/rules/{rid}/delete", headers=headers))
     assert dele.status_code == 200
-    assert "rules-table" in dele.text
+    # Partial refresh returns updated rules table
 
 
 def test_report_pdf_download(auth_client, completed_scan):

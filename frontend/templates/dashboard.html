@@ -8,6 +8,16 @@
     <p class="text-xs text-slate-400">Across all active benchmarks</p>
   </div>
   <div class="rounded-2xl bg-white p-6 shadow">
+    <p class="text-sm font-medium text-slate-500">Enabled Rules</p>
+    <p class="mt-2 text-3xl font-semibold text-slate-900">{{ enabled_rules_count }}</p>
+    <p class="text-xs text-slate-400">Currently active controls</p>
+  </div>
+  <div class="rounded-2xl bg-white p-6 shadow">
+    <p class="text-sm font-medium text-slate-500">Last Rule Change</p>
+    <p class="mt-2 text-3xl font-semibold text-slate-900">{{ last_rule_modified.strftime('%b %d %H:%M') if last_rule_modified else 'N/A' }}</p>
+    <p class="text-xs text-slate-400">Most recent rule creation</p>
+  </div>
+  <div class="rounded-2xl bg-white p-6 shadow">
     <p class="text-sm font-medium text-slate-500">Total Scans</p>
     <p class="mt-2 text-3xl font-semibold text-slate-900">{{ scans_count }}</p>
     <p class="text-xs text-slate-400">Tracked executions</p>
@@ -26,6 +36,27 @@
     <p class="mt-2 text-3xl font-semibold text-slate-900">None</p>
     <p class="text-xs text-slate-400">No active schedules</p>
     {% endif %}
+  </div>
+</div>
+<div class="mb-8 rounded-2xl bg-white p-6 shadow">
+  <p class="text-sm font-medium text-slate-500">Severity Distribution</p>
+  <div class="mt-3 grid grid-cols-4 gap-3 text-center">
+    <div>
+      <p class="text-2xl font-semibold text-slate-900">{{ severity_counts.low }}</p>
+      <p class="text-xs text-slate-500">Low</p>
+    </div>
+    <div>
+      <p class="text-2xl font-semibold text-slate-900">{{ severity_counts.medium }}</p>
+      <p class="text-xs text-slate-500">Medium</p>
+    </div>
+    <div>
+      <p class="text-2xl font-semibold text-slate-900">{{ severity_counts.high }}</p>
+      <p class="text-xs text-slate-500">High</p>
+    </div>
+    <div>
+      <p class="text-2xl font-semibold text-slate-900">{{ severity_counts.critical }}</p>
+      <p class="text-xs text-slate-500">Critical</p>
+    </div>
   </div>
 </div>
 <div class="grid gap-6 lg:grid-cols-2">

@@ -240,11 +240,13 @@ def _rule_groups(session: Session) -> List[Dict[str, Any]]:
 
 
 def _render_rules_table(request: Request, session: Session, modal_reset: bool = False) -> HTMLResponse:
+    membership = getattr(request.state, "current_membership", None)
     context = {
         "request": request,
         "rules": _rule_list(session),
         "modal_reset": modal_reset,
         "csrf_token": _csrf_token(request),
+        "membership": membership,
     }
     return _templates().TemplateResponse("partials/rules_table.html", context)
 
@@ -373,6 +375,94 @@ async def rules_page(
     if _wants_json(request):
         return _json_payload({"page": "rules", "count": len(context["rules"])})
     return _templates().TemplateResponse("rules.html", context)
+
+
+@router.get("/rules/modal/edit/{rule_id}", response_class=HTMLResponse)
+async def rule_edit_modal(
+    rule_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
+    _ensure_admin(membership)
+    rule = session.get(Rule, rule_id)
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    context = {
+        "request": request,
+        "rule": _serialize_rule(rule),
+        "benchmarks": _benchmarks(session),
+        "csrf_token": _csrf_token(request),
+    }
+    return _templates().TemplateResponse("modals/rule_edit.html", context)
+
+
+@router.post(
+    "/rules/{rule_id}/update",
+    response_class=HTMLResponse,
+    dependencies=[Depends(verify_csrf_token)],
+)
+async def update_rule(
+    rule_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
+    _ensure_admin(membership)
+    rule = session.get(Rule, rule_id)
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    form = await request.form()
+    title = str(form.get("title", rule.title)).strip() or rule.title
+    severity = str(form.get("severity", rule.severity)).strip() or rule.severity
+    tags = str(form.get("tags", ",".join(json.loads(rule.tags_json or "[]"))))
+    description = str(form.get("description", rule.description))
+    remediation = str(form.get("remediation", rule.remediation))
+    command = str(form.get("command", rule.command)).strip() or rule.command
+    expect_value = str(form.get("expect_value", rule.expect_value)).strip() or rule.expect_value
+    benchmark_id = str(form.get("benchmark_id", rule.benchmark_id)).strip() or rule.benchmark_id
+    # apply updates
+    rule.title = title
+    rule.severity = severity
+    rule.description = description
+    rule.remediation = remediation
+    rule.command = command
+    rule.expect_value = expect_value
+    rule.benchmark_id = benchmark_id
+    tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
+    rule.tags_json = json.dumps(tag_list)
+    session.add(rule)
+    session.commit()
+    return _render_rules_table(request, session, modal_reset=True)
+
+
+@router.delete(
+    "/rules/{rule_id}",
+    response_class=HTMLResponse,
+    dependencies=[Depends(verify_csrf_token)],
+)
+async def delete_rule(
+    rule_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
+    _ensure_admin(membership)
+    rule = session.get(Rule, rule_id)
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    session.delete(rule)
+    session.commit()
+    return _render_rules_table(request, session, modal_reset=True)
 
 
 @router.get("/scans", response_class=HTMLResponse)

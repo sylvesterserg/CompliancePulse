@@ -263,6 +263,24 @@ def _render_scans_table(
     }
     return _templates().TemplateResponse("partials/scans_table.html", context)
 
+@router.get("/scans/{scan_id}/view", response_class=HTMLResponse)
+async def scan_details_modal(
+    scan_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
+    scan_service = ScanService(session, organization.id)
+    try:
+        scan = scan_service.get_scan(scan_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    context = {"request": request, "scan": scan}
+    return _templates().TemplateResponse("modals/scan_view.html", context)
+
 
 def _render_rule_groups_panel(
     request: Request,
@@ -748,3 +766,44 @@ async def report_modal(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     context = {"request": request, "report": report}
     return _templates().TemplateResponse("modals/report_view.html", context)
+
+@router.get("/reports/{report_id}/download")
+async def report_download_pdf(
+    report_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
+    scan_service = ScanService(session, organization.id)
+    try:
+        report = scan_service.get_report(report_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    from io import BytesIO
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=letter)
+    c.setTitle(f"CompliancePulse Report #{report.id}")
+    y = 750
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(72, y, f"Report #{report.id} • {report.hostname}")
+    y -= 22
+    c.setFont("Helvetica", 11)
+    c.drawString(72, y, f"Score: {report.score}%  Status: {report.status}  Severity: {report.severity}")
+    y -= 16
+    c.drawString(72, y, f"Benchmark: {report.benchmark_id}  Scan: {report.scan_id}")
+    y -= 24
+    summary = report.summary or ""
+    for i in range(0, len(summary), 90):
+        c.drawString(72, y, summary[i:i+90])
+        y -= 14
+    c.showPage()
+    c.save()
+    pdf = buf.getvalue()
+    buf.close()
+    from starlette.responses import Response as _Resp
+    return _Resp(pdf, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=report-{report.id}.pdf"})

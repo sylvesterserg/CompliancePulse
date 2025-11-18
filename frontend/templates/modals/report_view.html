@@ -1,0 +1,57 @@
+<div class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4">
+  <div class="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <div>
+        <p class="text-sm text-slate-500">Report #{{ report.id }}</p>
+        <h2 class="text-xl font-semibold text-slate-900">{{ report.hostname }}</h2>
+      </div>
+      <button class="text-slate-400 hover:text-slate-600" onclick="document.getElementById('modal-root').innerHTML=''">✕</button>
+    </div>
+    <div class="mt-4 grid gap-4 md:grid-cols-3">
+      <div class="rounded-xl bg-slate-50 p-4 text-center">
+        <p class="text-xs uppercase tracking-wide text-slate-500">Score</p>
+        <p class="text-3xl font-semibold text-emerald-600">{{ '%.0f'|format(report.score) }}%</p>
+      </div>
+      <div class="rounded-xl bg-slate-50 p-4 text-center">
+        <p class="text-xs uppercase tracking-wide text-slate-500">Status</p>
+        <p class="text-lg font-semibold text-slate-900">{{ report.status|title }}</p>
+      </div>
+      <div class="rounded-xl bg-slate-50 p-4 text-center">
+        <p class="text-xs uppercase tracking-wide text-slate-500">Generated</p>
+        <p class="text-lg font-semibold text-slate-900">{{ report.created_at.strftime('%b %d %Y') }}</p>
+      </div>
+    </div>
+    <p class="mt-4 text-sm text-slate-600">{{ report.summary }}</p>
+    {% if report.key_findings %}
+    <div class="mt-4">
+      <p class="text-xs uppercase tracking-wide text-slate-500">Key Findings</p>
+      <ul class="mt-2 space-y-1 text-sm text-slate-700">
+        {% for item in report.key_findings %}
+        <li>• {{ item }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    {% if report.remediations %}
+    <div class="mt-4">
+      <p class="text-xs uppercase tracking-wide text-slate-500">Recommended Actions</p>
+      <ul class="mt-2 space-y-1 text-sm text-slate-700">
+        {% for item in report.remediations %}
+        <li>• {{ item }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    <div class="mt-4">
+      <p class="text-xs uppercase tracking-wide text-slate-500">Tags</p>
+      <div class="mt-2 flex flex-wrap gap-2">
+        {% for tag in report.tags %}
+        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">{{ tag }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% if report.output_path %}
+    <p class="mt-4 text-xs text-slate-400">Artifact saved to {{ report.output_path }}</p>
+    {% endif %}
+  </div>
+</div>

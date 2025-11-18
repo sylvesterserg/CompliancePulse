@@ -1,0 +1,111 @@
+version: "3.9"
+
+services:
+  api:
+    image: compliancepulse-backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: compliancepulse-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_URL=sqlite:////app/data/compliancepulse.db
+      - ENVIRONMENT=development
+      - SESSION_SECRET_KEY=dev-session-key
+      - API_KEY_HASH_SALT=dev-api-salt
+      - STRIPE_WEBHOOK_SECRET=demo-stripe
+      - ALLOWED_COMMANDS=cat,grep,rpm,dpkg,stat,systemctl,test
+      - MAX_SCAN_RUNTIME_PER_JOB=900
+      - MAX_CONCURRENT_JOBS_PER_ORG=3
+      - API_KEY_RATE_LIMIT=1000
+      - API_KEY_RATE_WINDOW_SECONDS=3600
+      - AUDIT_LOG_RETENTION_DAYS=180
+      - SECURITY_TEST_MODE=0
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./frontend/templates:/app/frontend/templates
+      - ./frontend/static:/app/frontend/static
+    depends_on:
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  worker:
+    image: compliancepulse-backend
+    container_name: compliancepulse-worker
+    command: ["python", "worker.py"]
+    environment:
+      - DB_URL=sqlite:////app/data/compliancepulse.db
+      - ENVIRONMENT=development
+      - SESSION_SECRET_KEY=dev-session-key
+      - API_KEY_HASH_SALT=dev-api-salt
+      - STRIPE_WEBHOOK_SECRET=demo-stripe
+      - ALLOWED_COMMANDS=cat,grep,rpm,dpkg,stat,systemctl,test
+      - MAX_SCAN_RUNTIME_PER_JOB=900
+      - MAX_CONCURRENT_JOBS_PER_ORG=3
+      - API_KEY_RATE_LIMIT=1000
+      - API_KEY_RATE_WINDOW_SECONDS=3600
+      - AUDIT_LOG_RETENTION_DAYS=180
+      - SECURITY_TEST_MODE=0
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./frontend/templates:/app/frontend/templates
+      - ./frontend/static:/app/frontend/static
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  scheduler:
+    image: compliancepulse-backend
+    container_name: compliancepulse-scheduler
+    command: ["python", "scheduler_service.py"]
+    environment:
+      - DB_URL=sqlite:////app/data/compliancepulse.db
+      - ENVIRONMENT=development
+      - SESSION_SECRET_KEY=dev-session-key
+      - API_KEY_HASH_SALT=dev-api-salt
+      - STRIPE_WEBHOOK_SECRET=demo-stripe
+      - ALLOWED_COMMANDS=cat,grep,rpm,dpkg,stat,systemctl,test
+      - MAX_SCAN_RUNTIME_PER_JOB=900
+      - MAX_CONCURRENT_JOBS_PER_ORG=3
+      - API_KEY_RATE_LIMIT=1000
+      - API_KEY_RATE_WINDOW_SECONDS=3600
+      - AUDIT_LOG_RETENTION_DAYS=180
+      - SECURITY_TEST_MODE=0
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./frontend/templates:/app/frontend/templates
+      - ./frontend/static:/app/frontend/static
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+  tailwind:
+    image: node:20-alpine
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    command: ["sh", "-c", "npm install && npm run build:css"]
+    profiles: ["assets"]
+    restart: "no"
+
+  redis:
+    image: redis:7-alpine
+    container_name: compliancepulse-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    profiles: ["rate-limit"]
+    restart: unless-stopped

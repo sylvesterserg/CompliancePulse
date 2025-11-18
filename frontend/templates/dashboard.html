@@ -1,0 +1,104 @@
+{% extends "layout.html" %}
+{% block content %}
+{% set can_manage = membership.role in ['ADMIN', 'OWNER'] %}
+<div class="mb-8 grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+  <div class="rounded-2xl bg-white p-6 shadow">
+    <p class="text-sm font-medium text-slate-500">Total Rules</p>
+    <p class="mt-2 text-3xl font-semibold text-slate-900">{{ rules_count }}</p>
+    <p class="text-xs text-slate-400">Across all active benchmarks</p>
+  </div>
+  <div class="rounded-2xl bg-white p-6 shadow">
+    <p class="text-sm font-medium text-slate-500">Total Scans</p>
+    <p class="mt-2 text-3xl font-semibold text-slate-900">{{ scans_count }}</p>
+    <p class="text-xs text-slate-400">Tracked executions</p>
+  </div>
+  <div class="rounded-2xl bg-white p-6 shadow">
+    <p class="text-sm font-medium text-slate-500">Compliance Score</p>
+    <p class="mt-2 text-3xl font-semibold text-emerald-600">{{ '%.2f'|format(compliance_score) }}%</p>
+    <p class="text-xs text-slate-400">Rolling average of recent reports</p>
+  </div>
+  <div class="rounded-2xl bg-white p-6 shadow">
+    <p class="text-sm font-medium text-slate-500">Next Scan Scheduled</p>
+    {% if next_schedule %}
+    <p class="mt-2 text-3xl font-semibold text-slate-900">{{ next_schedule.next_run.strftime('%b %d %H:%M') if next_schedule.next_run else 'Queued' }}</p>
+    <p class="text-xs text-slate-400">{{ next_schedule.name }} · {{ next_schedule.group_name }}</p>
+    {% else %}
+    <p class="mt-2 text-3xl font-semibold text-slate-900">None</p>
+    <p class="text-xs text-slate-400">No active schedules</p>
+    {% endif %}
+  </div>
+</div>
+<div class="grid gap-6 lg:grid-cols-2">
+  <div class="rounded-2xl bg-white p-6 shadow">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-slate-900">Last Failed Scans</h2>
+      <a href="/scans" class="text-sm font-medium text-indigo-600 hover:text-indigo-500">View all</a>
+    </div>
+    <div class="mt-4 divide-y divide-slate-100">
+      {% if last_failed_scans %}
+        {% for scan in last_failed_scans %}
+        <div class="py-3">
+          <div class="flex items-center justify-between">
+            <p class="font-semibold text-slate-800">{{ scan.hostname }}</p>
+            <span class="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-600">Failed</span>
+          </div>
+          <p class="text-xs text-slate-500">Benchmark {{ scan.benchmark_id }} · {{ scan.started_at.strftime('%b %d %H:%M') if scan.started_at else 'N/A' }}</p>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="py-8 text-center text-sm text-slate-500">No failed scans in the recent history.</p>
+      {% endif %}
+    </div>
+  </div>
+  <div class="rounded-2xl bg-white p-6 shadow">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-slate-900">Latest Reports</h2>
+      <a href="/reports" class="text-sm font-medium text-indigo-600 hover:text-indigo-500">View reports</a>
+    </div>
+    <div class="mt-4 space-y-4">
+      {% for report in recent_reports %}
+      <div class="rounded-xl border border-slate-100 p-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="font-semibold text-slate-900">{{ report.hostname }}</p>
+            <p class="text-xs text-slate-500">Scan #{{ report.scan_id }}</p>
+          </div>
+          <span class="text-2xl font-bold text-emerald-600">{{ '%.0f'|format(report.score) }}%</span>
+        </div>
+        <p class="mt-2 text-sm text-slate-600">{{ report.summary }}</p>
+      </div>
+      {% else %}
+      <p class="py-8 text-center text-sm text-slate-500">No reports yet. Trigger a scan to populate insights.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+<div class="mt-6 grid gap-6 lg:grid-cols-2">
+  <div class="rounded-2xl bg-white p-6 shadow">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-slate-900">Rule Groups</h2>
+    </div>
+    <div class="mt-4">
+      {% include "partials/rule_groups.html" %}
+    </div>
+  </div>
+  <div class="rounded-2xl bg-white p-6 shadow">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-slate-900">Schedules</h2>
+      {% if can_manage %}
+      <button
+        class="rounded-full bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-indigo-500"
+        hx-get="/automation/modal/schedule"
+        hx-target="#modal-root"
+        hx-swap="innerHTML"
+      >
+        Create Schedule
+      </button>
+      {% endif %}
+    </div>
+    <div class="mt-4">
+      {% include "partials/schedules_table.html" %}
+    </div>
+  </div>
+</div>
+{% endblock %}

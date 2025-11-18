@@ -1,0 +1,68 @@
+schema_version: "0.3"
+benchmark:
+  id: "rocky_l1_foundation"
+  title: "Rocky Linux Level 1 Baseline"
+  description: |
+    Foundational checks aligned with CIS Rocky Linux Level 1 recommendations.
+    This baseline focuses on core OS hygiene and visibility.
+  version: "2023.10"
+  os_target: "rocky-linux-9"
+  metadata:
+    maintainer: "CompliancePulse"
+    source: "CIS Rocky Linux 9"
+    tags:
+      - rocky
+      - cis
+      - level1
+rules:
+  - id: "rocky-l1-001"
+    title: "Verify /etc/passwd integrity"
+    description: "Ensure the primary account database exists on disk."
+    severity: "medium"
+    remediation: |
+      Restore the /etc/passwd file from backups or reinstall the base OS package
+      responsible for user database management.
+    references:
+      - "CIS 6.2"
+    metadata:
+      category: "accounts"
+      cis_id: "6.2"
+    check:
+      type: "shell"
+      command: "test -f /etc/passwd"
+      timeout: 5
+      expect:
+        type: "exit_code"
+        value: 0
+  - id: "rocky-l1-002"
+    title: "Ensure kernel reports Linux"
+    description: "Validates kernel name to ensure the host is Linux-based."
+    severity: "low"
+    remediation: "Install Rocky Linux kernel packages and reboot into the correct kernel."
+    references:
+      - "CIS 1.1"
+    metadata:
+      category: "kernel"
+    check:
+      type: "shell"
+      command: "uname -s"
+      timeout: 5
+      expect:
+        type: "equals"
+        value: "Linux"
+  - id: "rocky-l1-003"
+    title: "Record system release"
+    description: "Captures release metadata for reporting consistency."
+    severity: "low"
+    remediation: "Ensure /etc/os-release is present."
+    references:
+      - "CIS 1.2"
+    metadata:
+      category: "inventory"
+    check:
+      type: "shell"
+      command: "grep ^NAME= /etc/os-release"
+      timeout: 5
+      expect:
+        type: "contains"
+        value: "Rocky"

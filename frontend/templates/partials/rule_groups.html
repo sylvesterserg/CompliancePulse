@@ -1,0 +1,34 @@
+{% set can_manage = membership.role in ['ADMIN', 'OWNER'] %}
+<div id="rule-groups-panel" class="space-y-4">
+  {% if message %}
+  <div class="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{{ message }}</div>
+  {% endif %}
+  {% for group in rule_groups %}
+  <div class="rounded-2xl border border-slate-100 bg-white p-4">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <p class="text-sm font-semibold text-slate-900">{{ group.name }}</p>
+        <p class="text-xs text-slate-500">Benchmark {{ group.benchmark_id }} · {{ group.rule_count }} rules</p>
+      </div>
+      {% if can_manage %}
+      <button
+        class="rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow hover:bg-indigo-500"
+        hx-post="/automation/groups/{{ group.id }}/run"
+        hx-target="#rule-groups-panel"
+        hx-swap="outerHTML"
+        hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+      >
+        Run Now
+      </button>
+      {% endif %}
+    </div>
+    <div class="mt-3 grid gap-3 text-xs text-slate-500 sm:grid-cols-3">
+      <p>Last Run: {{ group.last_run.strftime('%b %d %H:%M') if group.last_run else 'Never' }}</p>
+      <p>Next Scan: {{ group.next_run.strftime('%b %d %H:%M') if group.next_run else 'Not scheduled' }}</p>
+      <p>Pending Jobs: {{ group.pending_jobs }}</p>
+    </div>
+  </div>
+  {% else %}
+  <p class="text-sm text-slate-500">No rule groups configured.</p>
+  {% endfor %}
+</div>

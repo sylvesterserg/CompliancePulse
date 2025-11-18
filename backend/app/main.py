@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from starlette.responses import Response as StarletteResponse
 from fastapi.exceptions import HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -14,6 +14,7 @@ from sqlmodel import Session, select
 
 from .api import benchmarks, reports, rules, scans, schedules, security, ui_router
 from .auth import get_session_store
+from .auth.router import router as auth_router, org_router as auth_org_router
 from .config import settings
 from .database import engine, init_db
 from .models import Benchmark
@@ -77,6 +78,8 @@ async def session_middleware(request: Request, call_next):
 
 # Prefer UI routes first so JSON fallbacks apply to bare paths in tests
 app.include_router(ui_router.router)
+app.include_router(auth_router)
+app.include_router(auth_org_router)
 app.include_router(benchmarks.router)
 app.include_router(rules.router)
 app.include_router(scans.router)
@@ -176,6 +179,21 @@ def api_version() -> dict[str, str]:
 @app.get("/api/ping")
 def api_ping() -> dict[str, bool]:
     return {"pong": True}
+
+# Convenience aliases for common auth paths (improves UX and avoids 404s)
+@app.get("/login")
+def login_alias() -> StarletteResponse:
+    return RedirectResponse(url="/auth/login", status_code=303)
+
+
+@app.get("/register")
+def register_alias() -> StarletteResponse:
+    return RedirectResponse(url="/auth/register", status_code=303)
+
+
+@app.get("/logout")
+def logout_alias() -> StarletteResponse:
+    return RedirectResponse(url="/auth/logout", status_code=303)
 
 
 # In test mode, wrap ASGI to capture and mirror JSON body into a header

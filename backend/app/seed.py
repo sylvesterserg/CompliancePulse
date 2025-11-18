@@ -21,6 +21,7 @@ from .models import (
     UserOrganization,
 )
 from .services.benchmark_loader import PulseBenchmarkLoader
+from .auth.password_hasher import PasswordHasher
 
 
 def seed_dev_data(session: Session) -> None:
@@ -210,9 +211,11 @@ def seed_bootstrap_admin(session: Session) -> None:
         session.commit()
         session.refresh(organization)
 
+    # Use a conservative hasher profile to avoid excessive memory on small hosts
+    admin_hash = PasswordHasher(time_cost=1, memory_cost=4096, parallelism=1).hash(admin_password)
     user = User(
         email=admin_email.lower(),
-        hashed_password=hash_password(admin_password),
+        hashed_password=admin_hash,
         is_verified=True,
     )
     session.add(user)

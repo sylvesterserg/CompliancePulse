@@ -115,6 +115,20 @@ Auth via `Authorization: Bearer <token>` or `X-API-Key`.
 
 For a full API list and usage, see `docs/api.md`.
 
+### Auth & Smoke Tests
+
+- UI forms post to `/api/auth/login` and `/api/auth/register` (proxied to backend `/auth/*`).
+- CSRF is injected into templates; HTMX requests include `X-CSRF-Token` where applicable.
+- In production behind TLS, set `SESSION_SECURE_COOKIE=true`; cookie secure flag is auto-disabled on plain HTTP using `X-Forwarded-Proto`.
+
+Run the end-to-end smoke test:
+
+```
+bash ./deployment/stack_smoke.sh
+```
+
+This validates NGINX, API health, UI login + cookie, dashboard HTML, static assets, Rules/Scans/Schedules/Reports UI flows, and tail logs for stability.
+
 ## Production Deployment (Phase 1.0)
 
 This section explains production deployment with Docker Compose or Podman, systemd units, Nginx, environment variables, and release builds.

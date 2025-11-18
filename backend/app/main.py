@@ -63,12 +63,15 @@ async def session_middleware(request: Request, call_next):
     request.state.session_data = session_data
     response = await call_next(request)
     if getattr(request.state, "session_needs_cookie", False):
+        # Honor secure cookies only when running behind HTTPS to preserve local dev UX
+        forwarded_proto = request.headers.get("x-forwarded-proto", "").lower()
+        secure_cookie = settings.cookie_secure and forwarded_proto == "https"
         response.set_cookie(
             key=settings.session_cookie_name,
             value=session_store.sign(session_id),
             max_age=settings.session_max_age,
             httponly=True,
-            secure=settings.cookie_secure,
+            secure=secure_cookie,
             samesite="strict",
         )
     elif getattr(request.state, "session_dirty", False):

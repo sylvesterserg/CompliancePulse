@@ -21,6 +21,7 @@ services:
       - .env
     environment:
       ENVIRONMENT: production
+      SESSION_SECURE_COOKIE: "true"
     expose:
       - "8000"
     healthcheck:

@@ -1,0 +1,36 @@
+<html><head><script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script></head><body><div class="mermaid">%% Mermaid: API Routing
+flowchart LR
+  A[FastAPI app] --> B[UI Router]
+  A --> C[/benchmarks]
+  A --> D[/rules]
+  A --> E[/scans]
+  A --> F[/reports]
+  A --> G[/schedules]
+  A --> H[/settings/api-keys]
+  A --> I[/api, /health, /api/version, /api/ping]
+
+  C -->|GET| C1[list]
+  C -->|GET| C2[detail]
+  C -->|GET| C3[rules]
+  C -->|POST| C4[reload]
+
+  D -->|GET| D1[list]
+  D -->|GET| D2[detail]
+
+  E -->|POST| E1[create]
+  E -->|GET| E2[list]
+  E -->|GET| E3[detail]
+  E -->|GET| E4[report]
+  E -->|POST| E5[trigger group]
+
+  F -->|GET| F1[list]
+  F -->|GET| F2[detail]
+
+  G -->|GET| G1[list]
+  G -->|POST| G2[create]
+  G -->|DELETE| G3[delete]
+
+  H -->|GET| H1[list]
+  H -->|POST| H2[create]
+  H -->|POST| H3[revoke]
+  H -->|GET| H4[show]</div></body></html>

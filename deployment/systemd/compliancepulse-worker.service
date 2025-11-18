@@ -1,0 +1,29 @@
+[Unit]
+Description=CompliancePulse Worker (container)
+Wants=network-online.target
+After=network-online.target compliancepulse-api.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Environment=COMPOSE_FILE=/opt/compliancepulse/docker-compose.prod.yml
+WorkingDirectory=/opt/compliancepulse
+ExecStart=/bin/sh -lc 'ENGINE=$$(command -v docker >/dev/null 2>&1 && echo docker || echo podman); $$ENGINE compose -f $$COMPOSE_FILE up -d worker'
+ExecStop=/bin/sh -lc 'ENGINE=$$(command -v docker >/dev/null 2>&1 && echo docker || echo podman); $$ENGINE compose -f $$COMPOSE_FILE stop worker'
+ExecReload=/bin/sh -lc 'ENGINE=$$(command -v docker >/dev/null 2>&1 && echo docker || echo podman); $$ENGINE compose -f $$COMPOSE_FILE up -d --no-deps worker'
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+MemoryDenyWriteExecute=yes
+LockPersonality=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+

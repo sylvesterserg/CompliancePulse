@@ -1,0 +1,12 @@
+<html><head><script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script></head><body><div class="mermaid">%% Mermaid: Services and Engine
+flowchart TB
+  ScanService --> ScanExecutor
+  ScanService --> DB[(DB)]
+  ScanExecutor --> RuleEngine
+  RuleEngine -->|allowed commands| Shell[OS Shell]
+  ScanExecutor --> Artifacts[(Artifacts/Logs)]
+  ScheduleService --> DB
+  ScheduleManager --> DB
+  ScheduleManager -->|enqueue| ScanJob[(ScanJob)]
+  Worker -->|claim| ScanJob
+  Worker --> ScanExecutor</div></body></html>

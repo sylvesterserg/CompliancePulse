@@ -114,3 +114,35 @@ Auth via `Authorization: Bearer <token>` or `X-API-Key`.
 - Developer docs under `docs/`
 
 For a full API list and usage, see `docs/api.md`.
+
+## Production Deployment (Phase 1.0)
+
+This section explains production deployment with Docker Compose or Podman, systemd units, Nginx, environment variables, and release builds.
+
+- Configure environment: copy `.env.production.template` to `.env` and set values
+  - `DB_URL` (database), `SESSION_SECRET_KEY`, `API_KEY_HASH_SALT` (secrets)
+  - Rate limits and directories (`DATA_DIR`, `LOGS_DIR`, `ARTIFACTS_DIR`)
+  - `ALLOWED_ORIGINS` for CORS
+
+- Docker Compose
+  - Build/validate: `./deployment/build_and_release.sh`
+  - Start: `docker compose -f docker-compose.prod.yml up -d`
+  - Stop: `docker compose -f docker-compose.prod.yml down`
+
+- Podman
+  - Build: `podman build -f backend/Dockerfile -t localhost/compliancepulse-backend:latest .`
+  - Start: `podman-compose -f podman-compose.prod.yml up -d`
+
+- Nginx
+  - Config at `deployment/nginx/compliancepulse.conf`
+  - Provide SSL certs in the `nginx_ssl` volume (`/etc/nginx/ssl`)
+  - Proxies `/api/` and `/` to backend; forwards `/static/` to the API static endpoint
+
+- systemd Units
+  - Copy repo to `/opt/compliancepulse` on the server
+  - Install: `sudo cp -a deployment/systemd/*.service /etc/systemd/system/ && sudo systemctl daemon-reload`
+  - Enable: `sudo systemctl enable --now compliancepulse-api.service compliancepulse-worker.service compliancepulse-scheduler.service compliancepulse-nginx.service`
+
+- Releases
+  - Optional push: set `REGISTRY` (e.g., `ghcr.io/your-org`) and run `deployment/build_and_release.sh`
+  - Script tags images with `VERSION` file or code version and validates compose

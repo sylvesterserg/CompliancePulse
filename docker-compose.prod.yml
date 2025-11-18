@@ -1,0 +1,131 @@
+version: "3.9"
+
+name: compliancepulse-prod
+
+networks:
+  prod_net:
+    driver: bridge
+
+volumes:
+  cp_data:
+  cp_logs:
+  nginx_ssl:
+
+services:
+  api:
+    image: compliancepulse-backend:latest
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: compliancepulse-api
+    env_file:
+      - .env
+    environment:
+      ENVIRONMENT: production
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - prod_net
+    volumes:
+      - cp_data:/app/data
+      - cp_logs:/app/logs
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+
+  worker:
+    image: compliancepulse-backend:latest
+    container_name: compliancepulse-worker
+    depends_on:
+      api:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      ENVIRONMENT: production
+    restart: unless-stopped
+    networks:
+      - prod_net
+    volumes:
+      - cp_data:/app/data
+      - cp_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://api:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 384M
+    command: ["python", "worker.py"]
+
+  scheduler:
+    image: compliancepulse-backend:latest
+    container_name: compliancepulse-scheduler
+    depends_on:
+      api:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      ENVIRONMENT: production
+    restart: unless-stopped
+    networks:
+      - prod_net
+    volumes:
+      - cp_data:/app/data
+      - cp_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://api:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+    command: ["python", "scheduler_service.py"]
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: compliancepulse-nginx
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deployment/nginx/compliancepulse.conf:/etc/nginx/conf.d/compliancepulse.conf:ro
+      - nginx_ssl:/etc/nginx/ssl
+      - cp_logs:/var/log/nginx
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - prod_net
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+

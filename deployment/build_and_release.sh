@@ -46,6 +46,17 @@ else
   exit 1
 fi
 
+# Validate nginx config syntax using official image if engine is available
+if command -v ${ENGINE} >/dev/null 2>&1; then
+  if [[ -f deployment/nginx/compliancepulse.conf ]]; then
+    echo "[lint] Validating nginx config syntax"
+    ${ENGINE} run --rm \
+      -v "${ROOT_DIR}/deployment/nginx/compliancepulse.conf:/etc/nginx/conf.d/compliancepulse.conf:ro" \
+      nginx:1.27-alpine nginx -t || {
+        echo "[lint] Nginx config validation failed" >&2; exit 1; }
+  fi
+fi
+
 if [[ -n "$REGISTRY" ]]; then
   echo "[push] Pushing images to $REGISTRY"
   ${ENGINE} push "$IMAGE_TAG"
@@ -59,4 +70,3 @@ echo "  Engine:       $ENGINE"
 echo "  Image:        $IMAGE_TAG"
 echo "  Latest tag:   $IMAGE_LATEST"
 echo "  Compose file: $( [[ -f docker-compose.prod.yml ]] && echo docker-compose.prod.yml || echo podman-compose.prod.yml )"
-

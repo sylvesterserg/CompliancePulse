@@ -65,6 +65,46 @@ curl -sf http://localhost/api/health | grep -q '"healthy"' || {
   exit 1
 }
 
+echo "[auth] Validating UI login form action points to /api/auth/login"
+curl -sf http://localhost/auth/login | grep -q '<form[^>]*action="/api/auth/login"' || {
+  echo "[fail] UI login form action not pointing to /api/auth/login" >&2
+  exit 1
+}
+
+echo "[auth] Testing API login via NGINX (/api/auth/login)"
+JAR="/tmp/cp_cookies.txt"
+rm -f "$JAR" || true
+LOGIN_HTML=$(curl -sf -c "$JAR" http://localhost/api/auth/login)
+CSRF_TOKEN=$(printf "%s" "$LOGIN_HTML" | sed -n 's/.*name="csrf_token" value="\([^"]*\)".*/\1/p')
+if [ -z "$CSRF_TOKEN" ]; then
+  echo "[fail] Could not extract CSRF token from /api/auth/login" >&2
+  exit 1
+fi
+
+# Use bootstrap admin credentials from defaults (matches .env)
+ADMIN_EMAIL=${ADMIN_EMAIL:-demo@compliancepulse.io}
+ADMIN_PASSWORD=${ADMIN_PASSWORD:-ChangeMe123!}
+
+# Perform login and validate redirect + session cookie
+AUTH_RESP=$(curl -s -D - -o /dev/null -b "$JAR" -c "$JAR" -X POST \
+  http://localhost/api/auth/login \
+  -d "email=${ADMIN_EMAIL}&password=${ADMIN_PASSWORD}&csrf_token=${CSRF_TOKEN}")
+printf "%s" "$AUTH_RESP" | grep -q "^HTTP/1.1 303" || {
+  echo "[fail] API login did not return 303 redirect" >&2
+  printf "%s\n" "$AUTH_RESP" >&2
+  exit 1
+}
+printf "%s" "$AUTH_RESP" | tr -d '\r' | grep -qi "^location: /" || {
+  echo "[fail] API login redirect Location header missing or incorrect" >&2
+  printf "%s\n" "$AUTH_RESP" >&2
+  exit 1
+}
+printf "%s" "$AUTH_RESP" | grep -qi "^set-cookie: .*cp_session=" || {
+  echo "[fail] API login did not set session cookie" >&2
+  printf "%s\n" "$AUTH_RESP" >&2
+  exit 1
+}
+
 echo "[stability] Monitoring worker and scheduler for 30s"
 sleep 30
 
@@ -78,4 +118,3 @@ for c in "$API_CTN" "$NGINX_CTN" "$WORKER_CTN" "$SCHED_CTN"; do
 done
 
 echo "[success] All systems healthy"
-

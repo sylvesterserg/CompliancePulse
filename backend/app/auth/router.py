@@ -22,8 +22,9 @@ from .dependencies import (
 from .forms import LoginForm, OrganizationForm, RegisterForm, ValidationError
 from .utils import hash_password, slugify, verify_password
 
-router = APIRouter(prefix="/auth", tags=["auth"])
-org_router = APIRouter(prefix="/org", tags=["organizations"])
+# Expose paths via include_router prefixes in main (e.g., /api/auth, /api)
+router = APIRouter(tags=["auth"])
+org_router = APIRouter(tags=["organizations"])
 
 _templates = Jinja2Templates(directory=str(settings.frontend_template_dir))
 _templates.env.globals.update({"app_name": settings.app_name})

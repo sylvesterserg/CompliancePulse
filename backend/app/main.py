@@ -81,14 +81,14 @@ async def session_middleware(request: Request, call_next):
 
 # Prefer UI routes first so JSON fallbacks apply to bare paths in tests
 app.include_router(ui_router.router)
-app.include_router(auth_router)
-app.include_router(auth_org_router)
-app.include_router(benchmarks.router)
-app.include_router(rules.router)
-app.include_router(scans.router)
-app.include_router(reports.router)
-app.include_router(schedules.router)
-app.include_router(security.router)
+app.include_router(auth_router, prefix="/api/auth")
+app.include_router(auth_org_router, prefix="/api")
+app.include_router(benchmarks.router, prefix="/api")
+app.include_router(rules.router, prefix="/api")
+app.include_router(scans.router, prefix="/api")
+app.include_router(reports.router, prefix="/api")
+app.include_router(schedules.router, prefix="/api")
+app.include_router(security.router, prefix="/api")
 
 
 @app.middleware("http")
@@ -144,7 +144,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
     if exc.status_code in (401, 403) and not is_api_path and not is_ajax:
         # Bounce to login page for unauthenticated or CSRF issues in the UI
-        return RedirectResponse(url="/auth/login", status_code=303)
+        return RedirectResponse(url="/api/auth/login", status_code=303)
 
     if exc.status_code == 401 and wants_json:
         payload = {"error": "unauthorized", "status": 401}
@@ -203,17 +203,17 @@ def api_ping() -> dict[str, bool]:
 # Convenience aliases for common auth paths (improves UX and avoids 404s)
 @app.get("/login")
 def login_alias() -> StarletteResponse:
-    return RedirectResponse(url="/auth/login", status_code=303)
+    return RedirectResponse(url="/api/auth/login", status_code=303)
 
 
 @app.get("/register")
 def register_alias() -> StarletteResponse:
-    return RedirectResponse(url="/auth/register", status_code=303)
+    return RedirectResponse(url="/api/auth/register", status_code=303)
 
 
 @app.get("/logout")
 def logout_alias() -> StarletteResponse:
-    return RedirectResponse(url="/auth/logout", status_code=303)
+    return RedirectResponse(url="/api/auth/logout", status_code=303)
 
 
 # In test mode, wrap ASGI to capture and mirror JSON body into a header

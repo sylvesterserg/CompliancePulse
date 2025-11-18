@@ -139,7 +139,7 @@ def _redirect_to_login() -> RedirectResponse:
 
     # Starlette doesn't pass request here, so rely on global header inspection via context not available.
     # Callers that want JSON should use the helper exposed by handlers below.
-    return RedirectResponse("/auth/login", status_code=303)
+    return RedirectResponse("/api/auth/login", status_code=303)
 
 
 def _wants_json(request: Request) -> bool:

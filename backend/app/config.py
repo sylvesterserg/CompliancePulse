@@ -39,6 +39,7 @@ class Settings(BaseModel):
 
         values: dict[str, object] = {}
         db_url = os.getenv("DB_URL")
+        app_version = os.getenv("APP_VERSION")
         benchmark_dir = os.getenv("BENCHMARK_DIR")
         timeout = os.getenv("SHELL_TIMEOUT")
         environment = os.getenv("ENVIRONMENT")
@@ -91,6 +92,8 @@ class Settings(BaseModel):
         allowed_origins = os.getenv("ALLOWED_ORIGINS")
         if allowed_origins:
             values["allow_origins"] = [x.strip() for x in allowed_origins.split(",") if x.strip()]
+        if app_version:
+            values["version"] = app_version
         return cls(**values)
 
 

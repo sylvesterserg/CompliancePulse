@@ -91,7 +91,8 @@ async def login(
     request.state.session_data = session_data
     response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     forwarded_proto = request.headers.get("x-forwarded-proto", "").lower()
-    secure_cookie = settings.cookie_secure and forwarded_proto == "https"
+    # Mark secure when behind HTTPS, or if explicitly configured
+    secure_cookie = (forwarded_proto == "https") or settings.cookie_secure
     response.set_cookie(
         key=settings.session_cookie_name,
         value=session_store.sign(session_id),
@@ -181,25 +182,26 @@ async def register(
 async def logout(request: Request) -> HTMLResponse:
     session_store = get_session_store()
     session_id = getattr(request.state, "session_id", None)
+    session_data = getattr(request.state, "session_data", None)
     if session_id:
         session_store.destroy(session_id)
-        new_id, session_data = session_store.create()
-        request.state.session_id = new_id
-        request.state.session_data = session_data
-        cookie_value = session_store.sign(new_id)
-    else:
-        cookie_value = None
+    # Always issue a fresh anonymous session cookie
+    new_id, new_data = session_store.create()
+    request.state.session_id = new_id
+    request.state.session_data = new_data
+    cookie_value = session_store.sign(new_id)
     context = _base_context(request, "Signed Out")
     response = _templates.TemplateResponse("auth/logout.html", context)
-    if cookie_value:
-        response.set_cookie(
-            key=settings.session_cookie_name,
-            value=cookie_value,
-            max_age=settings.session_max_age,
-            httponly=True,
-            secure=settings.cookie_secure,
-            samesite="strict",
-        )
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").lower()
+    secure_cookie = settings.cookie_secure and forwarded_proto == "https"
+    response.set_cookie(
+        key=settings.session_cookie_name,
+        value=cookie_value,
+        max_age=settings.session_max_age,
+        httponly=True,
+        secure=secure_cookie,
+        samesite="strict",
+    )
     return response
 
 

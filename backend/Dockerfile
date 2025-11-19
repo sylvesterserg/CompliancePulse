@@ -32,11 +32,14 @@ COPY backend/benchmarks ./benchmarks
 COPY frontend/templates ./frontend/templates
 COPY --from=assets /build/frontend/static ./frontend/static
 
-RUN mkdir -p /app/data /app/logs /app/artifacts
+RUN mkdir -p /app/data /app/logs /app/artifacts \
+  && adduser --disabled-password --gecos "" appuser \
+  && chown -R appuser:appuser /app
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/api/health || exit 1
 
+USER appuser
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

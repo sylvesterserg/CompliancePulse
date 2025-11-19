@@ -1,6 +1,10 @@
 from .domain import (
     ApiKey,
     AuditLog,
+    Agent,
+    AgentAuthToken,
+    AgentJob,
+    AgentResult,
     Benchmark,
     MembershipRole,
     Organization,
@@ -18,6 +22,10 @@ from .domain import (
 __all__ = [
     "ApiKey",
     "AuditLog",
+    "Agent",
+    "AgentAuthToken",
+    "AgentJob",
+    "AgentResult",
     "Benchmark",
     "MembershipRole",
     "Organization",

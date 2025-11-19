@@ -67,7 +67,7 @@ def create_scan(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/trigger")
+@router.post("/trigger", dependencies=[Depends(_verify_csrf)])
 async def trigger_scan_alias(
     request: Request,
     service: ScanService = Depends(_get_service),
@@ -77,7 +77,6 @@ async def trigger_scan_alias(
     content_type = (request.headers.get("content-type") or "").lower()
     is_htmx = request.headers.get("hx-request", "").lower() == "true"
     if is_htmx or content_type.startswith("application/x-www-form-urlencoded") or content_type.startswith("multipart/form-data"):
-        await _verify_csrf(request)  # raises HTTPException on failure
         form = await request.form()
         hostname = str(form.get("hostname", "")).strip()
         ip = str(form.get("ip", form.get("ip_address", ""))).strip() or None

@@ -146,6 +146,53 @@ class Report(SQLModel, table=True):
     remediations_json: str = Field(default="[]")
 
 
+class Agent(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
+    uuid: str = Field(index=True)
+    hostname: str
+    ip: Optional[str] = None
+    os: Optional[str] = None
+    version: Optional[str] = None
+    first_seen: datetime = Field(default_factory=datetime.utcnow)
+    last_seen: datetime = Field(default_factory=datetime.utcnow)
+    status: str = Field(default="offline")
+    tags_json: str = Field(default="[]")
+
+
+class AgentAuthToken(SQLModel, table=True):
+    token: str = Field(primary_key=True, index=True)
+    agent_id: int = Field(foreign_key="agent.id", index=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
+    expires_at: datetime
+    revoked: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class AgentJob(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
+    agent_id: int = Field(foreign_key="agent.id", index=True)
+    benchmark_id: str = Field(foreign_key="benchmark.id")
+    rules_json: str = Field(default="[]")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    status: str = Field(default="pending")
+    dispatched_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+
+class AgentResult(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
+    agent_job_id: int = Field(foreign_key="agentjob.id", index=True)
+    raw_json: str = Field(default="{}")
+    html_report: Optional[str] = None
+    pdf_report: Optional[str] = None
+    status: str = Field(default="generated")
+    score: float = 0.0
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class Schedule(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     organization_id: int = Field(foreign_key="organization.id", index=True)

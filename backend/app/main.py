@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 
 from .api import benchmarks, reports, rules, scans, schedules, security, ui_router
+from .api import agent_machine as agent_machine_api
 from .api import ai as ai_api
 from .api import ingest as ingest_api
 from .api import agent as agent_api
@@ -99,6 +100,7 @@ app.include_router(ai_api.router, prefix="/api")
 app.include_router(ingest_api.router, prefix="/api")
 app.include_router(agent_api.router, prefix="/api")
 app.include_router(theme_api.router, prefix="/api")
+app.include_router(agent_machine_api.router, prefix="/api")
 
 
 @app.middleware("http")

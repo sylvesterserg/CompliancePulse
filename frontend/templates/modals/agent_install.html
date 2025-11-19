@@ -1,0 +1,17 @@
+<div class="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4">
+  <div class="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-slate-900">Agent Installation</h2>
+      <button class="text-slate-400 hover:text-slate-600" onclick="document.getElementById('modal-root').innerHTML=''">✕</button>
+    </div>
+    <div class="mt-4 space-y-4">
+      <p class="text-sm text-slate-600">Run this on each target machine:</p>
+      <pre class="rounded-lg bg-slate-900 p-3 text-xs text-slate-100 overflow-auto"><code>{{ script }}</code></pre>
+      <p class="text-xs text-slate-500">The script installs the agent, registers it with the server, and starts a systemd service.</p>
+      <div class="text-right">
+        <button class="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white" onclick="document.getElementById('modal-root').innerHTML=''">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+

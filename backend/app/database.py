@@ -8,7 +8,7 @@ from sqlalchemy.orm import with_loader_criteria
 from sqlmodel import Session, SQLModel, create_engine
 
 from .config import settings
-from .models import Report, Rule, RuleGroup, Scan, ScanJob, ScanResult, Schedule
+from .models import Report, Rule, RuleGroup, Scan, ScanJob, ScanResult, Schedule, Agent, AgentAuthToken, AgentJob, AgentResult
 
 engine = create_engine(settings.database_url, echo=False)
 
@@ -20,6 +20,10 @@ TENANT_AWARE_MODELS: Sequence[Type[SQLModel]] = (
     Report,
     Schedule,
     ScanJob,
+    Agent,
+    AgentAuthToken,
+    AgentJob,
+    AgentResult,
 )
 
 

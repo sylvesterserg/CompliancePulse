@@ -29,6 +29,7 @@ from ..models import (
 from ..schemas import ScanRequest, ScheduleCreate
 from ..services.scan_service import ScanService
 from ..services.schedule_service import ScheduleService
+from ..models import Agent as AgentModel
 
 import logging
 
@@ -549,6 +550,44 @@ async def scans_page(
     if _wants_json(request):
         return _json_payload({"page": "scans", "count": len(context["scans"])})
     return _templates().TemplateResponse("scans.html", context)
+
+
+@router.get("/agents", response_class=HTMLResponse)
+async def agents_page(
+    request: Request,
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        if _wants_json(request):
+            return _json_payload({"error": "unauthorized", "status": 401}, status_code=401)
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
+    agents = session.exec(select(AgentModel).order_by(AgentModel.last_seen.desc())).all()
+    context = {
+        **_base_context(request, session, "agents", user, organization, organizations, membership),
+        "agents": agents,
+    }
+    if _wants_json(request):
+        return _json_payload({"page": "agents", "count": len(agents)})
+    return _templates().TemplateResponse("agents.html", context)
+
+
+@router.get("/agents/modal/install", response_class=HTMLResponse)
+async def agent_install_modal(
+    request: Request,
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
+    script = (
+        "curl -fsSL https://example.com/install-agent.sh | bash -s -- "
+        "--server http://YOUR_SERVER --org {}".format(organization.id)
+    )
+    context = {"request": request, "script": script}
+    return _templates().TemplateResponse("modals/agent_install.html", context)
 
 
 @router.post("/scans")

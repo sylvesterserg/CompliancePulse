@@ -1,0 +1,51 @@
+{% extends "layout.html" %}
+{% block content %}
+{% set can_manage = membership.role in ['ADMIN', 'OWNER'] %}
+<div class="flex items-center justify-between">
+  <div>
+    <h1 class="text-2xl font-semibold text-slate-900">Agents</h1>
+    <p class="text-sm text-slate-500">{{ agents|length }} registered nodes</p>
+  </div>
+  {% if can_manage %}
+  <button
+    class="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-500"
+    hx-get="/agents/modal/install"
+    hx-target="#modal-root"
+    hx-swap="innerHTML"
+  >
+    Install Instructions
+  </button>
+  {% endif %}
+  </div>
+<div class="mt-6 overflow-hidden rounded-2xl bg-white shadow">
+  <table class="min-w-full text-left text-sm">
+    <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+      <tr>
+        <th class="px-4 py-3">Hostname</th>
+        <th class="px-4 py-3">OS</th>
+        <th class="px-4 py-3">IP</th>
+        <th class="px-4 py-3">Status</th>
+        <th class="px-4 py-3">Last Seen</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-slate-100">
+      {% for a in agents %}
+      <tr>
+        <td class="px-4 py-3 font-medium text-slate-900">{{ a.hostname }}</td>
+        <td class="px-4 py-3 text-slate-600">{{ a.os or 'unknown' }}</td>
+        <td class="px-4 py-3 text-slate-600">{{ a.ip or '-' }}</td>
+        <td class="px-4 py-3">
+          <span class="rounded-full px-2.5 py-1 text-xs font-semibold {% if a.status=='online' %}bg-emerald-100 text-emerald-700{% else %}bg-slate-100 text-slate-600{% endif %}">{{ a.status|title }}</span>
+        </td>
+        <td class="px-4 py-3 text-slate-600">{{ a.last_seen.strftime('%b %d %H:%M') if a.last_seen else 'N/A' }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="5" class="px-4 py-6 text-center text-sm text-slate-500">No agents yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+ </div>
+{% endblock %}
+

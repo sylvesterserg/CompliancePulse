@@ -165,6 +165,14 @@ def _base_context(
     organizations: List[Organization],
     membership: UserOrganization,
 ) -> Dict[str, Any]:
+    # White-label assets
+    from pathlib import Path as _P
+    tenant_dir = _P(settings.frontend_static_dir) / "tenants" / str(organization.id)
+    css_path = tenant_dir / "theme.css"
+    logo_path = tenant_dir / "logo.png"
+    css_url = f"/static/tenants/{organization.id}/theme.css" if css_path.exists() else None
+    logo_url = f"/static/tenants/{organization.id}/logo.png" if logo_path.exists() else None
+
     return {
         "request": request,
         "environment": settings.environment,
@@ -176,6 +184,8 @@ def _base_context(
         "organizations": organizations,
         "membership": membership,
         "csrf_token": _csrf_token(request),
+        "tenant_css": css_url,
+        "tenant_logo": logo_url,
     }
 
 

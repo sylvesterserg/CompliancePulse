@@ -13,7 +13,7 @@ class Settings(BaseModel):
     """Runtime configuration for the CompliancePulse API."""
 
     app_name: str = "CompliancePulse API"
-    version: str = "0.6.0"
+    version: str = "1.0.0-alpha"
     environment: str = "development"
     database_url: str = f"sqlite:///{DEFAULT_DB_PATH.as_posix()}"
     benchmark_dir: Path = BACKEND_ROOT / "benchmarks"

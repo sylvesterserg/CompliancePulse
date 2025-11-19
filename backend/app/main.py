@@ -13,6 +13,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 
 from .api import benchmarks, reports, rules, scans, schedules, security, ui_router
+from .api import ai as ai_api
+from .api import ingest as ingest_api
+from .api import agent as agent_api
+from .api import theme as theme_api
 from .auth import get_session_store
 from .auth.router import router as auth_router, org_router as auth_org_router
 from .config import settings
@@ -89,6 +93,10 @@ app.include_router(scans.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(schedules.router, prefix="/api")
 app.include_router(security.router, prefix="/api")
+app.include_router(ai_api.router, prefix="/api")
+app.include_router(ingest_api.router, prefix="/api")
+app.include_router(agent_api.router, prefix="/api")
+app.include_router(theme_api.router, prefix="/api")
 
 
 @app.middleware("http")

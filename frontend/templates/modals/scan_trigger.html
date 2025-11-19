@@ -7,7 +7,7 @@
     <form
       class="mt-4 space-y-4"
       method="post"
-      hx-post="/scans/trigger"
+      hx-post="/api/scans/trigger"
       hx-target="#scans-table"
       hx-swap="outerHTML"
     >
@@ -18,7 +18,7 @@
       </label>
       <label class="text-sm font-medium text-slate-600">
         IP Address
-        <input name="ip" class="mt-1 w-full rounded-lg border-slate-200" placeholder="optional" />
+        <input name="ip_address" class="mt-1 w-full rounded-lg border-slate-200" placeholder="optional" />
       </label>
       <label class="text-sm font-medium text-slate-600">
         Benchmark

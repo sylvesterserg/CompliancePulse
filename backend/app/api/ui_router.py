@@ -30,7 +30,10 @@ from ..schemas import ScanRequest, ScheduleCreate
 from ..services.scan_service import ScanService
 from ..services.schedule_service import ScheduleService
 
+import logging
+
 router = APIRouter()
+logger = logging.getLogger("compliancepulse.ui")
 
 def _json_payload(payload: Dict[str, Any], status_code: int | None = None) -> JSONResponse:
     as_text = json.dumps(payload)
@@ -778,15 +781,27 @@ async def trigger_scan(
     user, organization, organizations, membership = context_tuple
     _ensure_admin(membership)
     form = await request.form()
+    # Support alternate field names to be resilient to template drift
     hostname = str(form.get("hostname", "")).strip()
-    ip = str(form.get("ip", "")).strip()
-    benchmark_id = str(form.get("benchmark_id", "")).strip()
+    ip = str(form.get("ip", form.get("ip_address", ""))).strip()
+    benchmark_id = str(
+        form.get(
+            "benchmark_id",
+            form.get("benchmark", form.get("benchmarkName", form.get("benchmark_name", ""))),
+        )
+    ).strip()
     tags = str(form.get("tags", ""))
     if not hostname or not benchmark_id:
         raise HTTPException(status_code=400, detail="Missing required fields")
     scan_service = ScanService(session, organization.id)
     tag_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
     payload = ScanRequest(hostname=hostname, ip=ip or None, benchmark_id=benchmark_id, tags=tag_list)
+    logger.info(
+        "UI trigger_scan hostname=%s benchmark_id=%s tags=%s",
+        hostname,
+        benchmark_id,
+        ",".join(tag_list),
+    )
     scan_service.start_scan(payload)
     return _render_scans_table(request, scan_service, modal_reset=True)
 

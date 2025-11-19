@@ -15,6 +15,9 @@ from ..schemas import (
     ScanSummary,
 )
 from .scan_executor import ScanExecutor
+import logging
+
+logger = logging.getLogger("compliancepulse.scan_service")
 
 
 class ScanService:
@@ -35,6 +38,43 @@ class ScanService:
         if not benchmark:
             raise ValueError(f"Benchmark '{request.benchmark_id}' not found")
         rules = self.session.exec(select(Rule).where(Rule.benchmark_id == request.benchmark_id)).all()
+        import os
+        if not rules and os.getenv("ENABLE_BASELINE_RULE_AUTO_CREATE", "").lower() in {"1", "true", "yes"}:
+            # Auto-provision a minimal rule so scans can complete during initial setup (opt-in)
+            dummy_rule_id = f"{benchmark.id}:baseline-ping"
+            exists = self.session.get(Rule, dummy_rule_id)
+            if not exists:
+                from datetime import datetime as _dt
+                exists = Rule(
+                    id=dummy_rule_id,
+                    organization_id=self.organization_id,
+                    benchmark_id=benchmark.id,
+                    title="Baseline agent availability",
+                    description="Verifies the worker can execute a simple command",
+                    severity="low",
+                    remediation="Ensure worker container is healthy",
+                    references_json=json.dumps([]),
+                    metadata_json=json.dumps({"type": "shell"}),
+                    tags_json=json.dumps(["baseline", "diagnostic"]),
+                    check_type="shell",
+                    command="echo ok",
+                    expect_type="equals",
+                    expect_value="ok",
+                    timeout_seconds=5,
+                    status="active",
+                    last_run=None,
+                    created_at=_dt.utcnow(),
+                )
+                self.session.add(exists)
+                self.session.commit()
+            rules = [exists]
+        logger.info(
+            "Starting scan hostname=%s benchmark=%s rules=%s tags=%s",
+            request.hostname,
+            benchmark.id,
+            len(rules),
+            ",".join(request.tags or []),
+        )
         result = self.executor.run_for_rules(
             hostname=request.hostname,
             ip=request.ip,

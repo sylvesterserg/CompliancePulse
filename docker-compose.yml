@@ -12,6 +12,7 @@ services:
     environment:
       - DB_URL=sqlite:////app/data/compliancepulse.db
       - ENVIRONMENT=development
+      - ENABLE_BASELINE_RULE_AUTO_CREATE=1
       - SESSION_SECRET_KEY=dev-session-key
       - API_KEY_HASH_SALT=dev-api-salt
       - STRIPE_WEBHOOK_SECRET=demo-stripe
@@ -45,6 +46,7 @@ services:
     environment:
       - DB_URL=sqlite:////app/data/compliancepulse.db
       - ENVIRONMENT=development
+      - ENABLE_BASELINE_RULE_AUTO_CREATE=1
       - SESSION_SECRET_KEY=dev-session-key
       - API_KEY_HASH_SALT=dev-api-salt
       - STRIPE_WEBHOOK_SECRET=demo-stripe
@@ -72,6 +74,7 @@ services:
     environment:
       - DB_URL=sqlite:////app/data/compliancepulse.db
       - ENVIRONMENT=development
+      - ENABLE_BASELINE_RULE_AUTO_CREATE=1
       - SESSION_SECRET_KEY=dev-session-key
       - API_KEY_HASH_SALT=dev-api-salt
       - STRIPE_WEBHOOK_SECRET=demo-stripe

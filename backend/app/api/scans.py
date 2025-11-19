@@ -9,6 +9,7 @@ import json
 from sqlmodel import Session
 
 from ..auth.dependencies import get_current_organization, require_role, require_authenticated_user
+from ..auth.dependencies import verify_csrf_token as _verify_csrf
 from ..models import MembershipRole
 from ..schemas import ReportView, ScanDetail, ScanJobView, ScanRequest, ScanSummary
 from ..security.api_keys import get_optional_api_key
@@ -17,6 +18,7 @@ from ..security.rate_limit import rate_limit
 from ..security.utils import mask_secret
 from ..services.scan_service import ScanService
 from .deps import get_db_session
+from . import ui_router as _ui
 
 router = APIRouter(
     prefix="/scans",
@@ -66,12 +68,39 @@ def create_scan(
 
 
 @router.post("/trigger")
-def trigger_scan_alias(
-    payload: ScanRequest,
+async def trigger_scan_alias(
     request: Request,
     service: ScanService = Depends(_get_service),
     api_key=Depends(get_optional_api_key),
 ):
+    # HTMX/UI form submission: parse form data, enforce CSRF, and return HTML partial
+    content_type = (request.headers.get("content-type") or "").lower()
+    is_htmx = request.headers.get("hx-request", "").lower() == "true"
+    if is_htmx or content_type.startswith("application/x-www-form-urlencoded") or content_type.startswith("multipart/form-data"):
+        await _verify_csrf(request)  # raises HTTPException on failure
+        form = await request.form()
+        hostname = str(form.get("hostname", "")).strip()
+        ip = str(form.get("ip", form.get("ip_address", ""))).strip() or None
+        benchmark_id = str(form.get("benchmark_id", "")).strip()
+        tags = str(form.get("tags", ""))
+        tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+        if not hostname or not benchmark_id:
+            raise HTTPException(status_code=400, detail="Missing required fields")
+        payload = ScanRequest(hostname=hostname, ip=ip, benchmark_id=benchmark_id, tags=tag_list)
+        detail = service.start_scan(payload)
+        log_action(
+            action_type="SCAN_TRIGGER",
+            resource_type="SCAN",
+            resource_id=detail.id,
+            request=request,
+            user=None,
+            org=None,
+            metadata={"benchmark_id": benchmark_id, "hostname": hostname, "api_key": mask_secret(api_key.prefix) if api_key else None},
+        )
+        return _ui._render_scans_table(request, service, modal_reset=True)
+    # JSON API: delegate to standard creator
+    body = await request.json()
+    payload = ScanRequest(**body)
     return create_scan(payload, request, service, api_key)
 
 

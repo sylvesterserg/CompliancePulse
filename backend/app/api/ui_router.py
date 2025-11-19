@@ -376,12 +376,17 @@ async def dashboard(
         "next_schedule": schedule_service.get_next_schedule(),
     }
     if _wants_json(request):
+        # Provide extra context for smoke tests in JSON mode
         return _json_payload({
             "page": "dashboard",
             "health_status": context["health_status"],
             "rules_count": context["rules_count"],
             "scans_count": context["scans_count"],
             "compliance_score": context["compliance_score"],
+            "recent_reports": [
+                {"id": r.id, "score": r.score, "scan_id": r.scan_id}
+                for r in reports[:4]
+            ],
         })
     return _templates().TemplateResponse("dashboard.html", context)
 

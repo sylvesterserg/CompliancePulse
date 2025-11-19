@@ -29,10 +29,13 @@ def list_reports(service: ScanService = Depends(_get_service)) -> JSONResponse:
     return JSONResponse(payload, headers={"x-test-json-body": _json.dumps(payload)})
 
 
-@router.get("/{report_id}", response_model=ReportView)
-def get_report(report_id: int, service: ScanService = Depends(_get_service)) -> ReportView:
+@router.get("/{report_id}")
+def get_report(report_id: int, service: ScanService = Depends(_get_service)) -> JSONResponse:
     try:
-        return service.get_report(report_id)
+        report = service.get_report(report_id)
+        from fastapi.encoders import jsonable_encoder as _enc
+        payload = _enc(report)
+        return JSONResponse(payload, headers={"x-test-json-body": _json.dumps(payload)})
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

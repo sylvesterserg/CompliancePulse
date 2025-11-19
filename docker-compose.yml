@@ -28,9 +28,7 @@ services:
       - ./logs:/app/logs
       - ./frontend/templates:/app/frontend/templates
       - ./frontend/static:/app/frontend/static
-    depends_on:
-      redis:
-        condition: service_started
+    # Redis is optional; API will use in-memory rate limit if Redis is not enabled.
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]

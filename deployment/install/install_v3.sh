@@ -29,6 +29,10 @@ echo "[3/6] NGINX provided by container; no host nginx required"
 
 echo "[4/6] Pull/build images"
 cd "$(dirname "$0")/../.."
+# Ensure .env contains APP_VERSION to surface in API and UI
+if ! grep -q '^APP_VERSION=' .env 2>/dev/null; then
+  echo "APP_VERSION=1.0.0-alpha" >> .env
+fi
 docker compose -f docker-compose.prod.yml build
 
 echo "[5/6] Create data/logs directories"

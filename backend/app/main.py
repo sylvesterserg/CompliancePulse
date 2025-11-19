@@ -193,7 +193,7 @@ def api_root() -> dict[str, str]:
 def api_health() -> dict[str, str]:
     with Session(engine) as session:
         session.exec(select(Benchmark).limit(1))
-    payload = {"status": "healthy", "database": "connected"}
+    payload = {"status": "healthy", "database": "connected", "version": settings.version}
     # Emit header copy for test client's simple body capture
     from fastapi.responses import JSONResponse
     import json as _json

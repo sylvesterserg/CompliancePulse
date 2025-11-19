@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 from pydantic import BaseModel
+try:
+    from .version import APP_VERSION as _DEFAULT_VERSION
+except Exception:  # pragma: no cover
+    _DEFAULT_VERSION = "1.0.0-alpha"
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -13,7 +17,7 @@ class Settings(BaseModel):
     """Runtime configuration for the CompliancePulse API."""
 
     app_name: str = "CompliancePulse API"
-    version: str = "1.0.0-alpha"
+    version: str = _DEFAULT_VERSION
     environment: str = "development"
     database_url: str = f"sqlite:///{DEFAULT_DB_PATH.as_posix()}"
     benchmark_dir: Path = BACKEND_ROOT / "benchmarks"

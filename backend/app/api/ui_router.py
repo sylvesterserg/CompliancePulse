@@ -50,7 +50,7 @@ def _templates() -> Jinja2Templates:
     global _templates_instance
     if _templates_instance is None:
         _templates_instance = Jinja2Templates(directory=str(settings.frontend_template_dir))
-        _templates_instance.env.globals.update({"app_name": settings.app_name})
+        _templates_instance.env.globals.update({"app_name": settings.app_name, "app_version": settings.version})
     return _templates_instance
 
 

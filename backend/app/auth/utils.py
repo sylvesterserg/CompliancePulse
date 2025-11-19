@@ -6,11 +6,22 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from typing import Dict, Optional
 
+import os
 from .password_hasher import PasswordHasher, VerifyMismatchError
 from .signing import BadSignature, Signer
 
 
-_hasher = PasswordHasher()
+# Configure password hashing. Some environments (OpenSSL builds) enforce
+# relatively low scrypt memory limits which can cause failures during
+# registration. Allow tuning via environment variables and pick safer
+# defaults that work across constrained containers.
+_hasher = PasswordHasher(
+    # Memory in KiB; default lowered from 64*1024 to 16*1024 to avoid
+    # OpenSSL scrypt "memory limit exceeded" on some distros.
+    memory_cost=int(os.getenv("PASS_HASH_MEMORY_KIB", str(16 * 1024))),
+    time_cost=int(os.getenv("PASS_HASH_TIME_COST", "3")),
+    parallelism=int(os.getenv("PASS_HASH_PARALLELISM", "2")),
+)
 
 
 @dataclass

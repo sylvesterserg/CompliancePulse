@@ -90,12 +90,14 @@ async def login(
     session_store.save(session_id, session_data)
     request.state.session_data = session_data
     response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").lower()
+    secure_cookie = settings.cookie_secure and forwarded_proto == "https"
     response.set_cookie(
         key=settings.session_cookie_name,
         value=session_store.sign(session_id),
         max_age=settings.session_max_age,
         httponly=True,
-        secure=settings.cookie_secure,
+        secure=secure_cookie,
         samesite="strict",
     )
     return response
@@ -162,12 +164,14 @@ async def register(
     session_store.save(session_id, session_data)
     request.state.session_data = session_data
     response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").lower()
+    secure_cookie = settings.cookie_secure and forwarded_proto == "https"
     response.set_cookie(
         key=settings.session_cookie_name,
         value=session_store.sign(session_id),
         max_age=settings.session_max_age,
         httponly=True,
-        secure=settings.cookie_secure,
+        secure=secure_cookie,
         samesite="strict",
     )
     return response
@@ -291,12 +295,14 @@ async def create_org(
         session_store.save(session_id, session_data)
         request.state.session_data = session_data
         response = RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
+        forwarded_proto = request.headers.get("x-forwarded-proto", "").lower()
+        secure_cookie = settings.cookie_secure and forwarded_proto == "https"
         response.set_cookie(
             key=settings.session_cookie_name,
             value=session_store.sign(session_id),
             max_age=settings.session_max_age,
             httponly=True,
-            secure=settings.cookie_secure,
+            secure=secure_cookie,
             samesite="strict",
         )
         return response

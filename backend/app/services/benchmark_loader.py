@@ -84,9 +84,12 @@ class PulseBenchmarkLoader:
         for rule in document.rules:
             tags = rule.metadata.get("tags", []) if isinstance(rule.metadata, dict) else []
             status = rule.metadata.get("status", "active") if isinstance(rule.metadata, dict) else "active"
+            # Ensure rule IDs are unique across organizations to avoid
+            # primary key collisions in multi-tenant setups.
+            unique_rule_id = f"{organization_id}:{rule.id}"
             session.add(
                 Rule(
-                    id=rule.id,
+                    id=unique_rule_id,
                     organization_id=organization_id,
                     benchmark_id=document.benchmark.id,
                     title=rule.title,

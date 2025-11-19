@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Iterable, List, Sequence
 
 from sqlmodel import Session, select
+import logging
 
 try:  # dual import roots for tests vs runtime
     from app.config import settings  # type: ignore
@@ -33,6 +34,9 @@ class ScanExecutionResult:
     scan: Scan
     results: List[ScanResult]
     report: Report
+
+
+logger = logging.getLogger("compliancepulse.engine")
 
 
 class ScanExecutor:
@@ -104,6 +108,8 @@ class ScanExecutor:
         scan.compliance_score = score
         self.session.add(scan)
 
+        total = len(rules)
+        status = "passed" if total and passed_rules == total else "attention"
         report = Report(
             organization_id=self.organization_id,
             scan_id=scan.id,
@@ -111,7 +117,7 @@ class ScanExecutor:
             hostname=scan.hostname,
             score=score,
             summary=summary_bundle.get("summary", ""),
-            status="passed" if passed_rules == len(rules) else "attention",
+            status=status,
             severity=scan.severity,
             tags_json=scan.tags_json,
             last_run=scan.completed_at,
@@ -260,10 +266,52 @@ class ScanExecutor:
             },
             "scan": scan_payload["scan"],
         }
+        # JSON artifact
         report_path = Path(settings.artifacts_dir) / f"report_{report.id}.json"
         report_path.write_text(json.dumps(report_payload, indent=2, default=str), encoding="utf-8")
         report_payload["report"]["output_path"] = str(report_path)
         report.output_path = str(report_path)
+        # Best-effort HTML artifact
+        try:
+            html_path = Path(settings.artifacts_dir) / f"report_{report.id}.html"
+            html = f"""
+<!DOCTYPE html><html><head><meta charset='utf-8'><title>Report #{report.id}</title>
+<style>body{{font-family:system-ui,sans-serif;padding:24px}} .meta{{color:#475569;font-size:12px}}</style>
+</head><body>
+<h1>Report #{report.id} · {scan.hostname}</h1>
+<p class='meta'>Benchmark {scan.benchmark_id} · Severity {report.severity} · Score {report.score}%</p>
+<h2>Summary</h2>
+<p>{report.summary or ''}</p>
+</body></html>
+"""
+            html_path.write_text(html, encoding="utf-8")
+        except Exception:  # pragma: no cover - artifact generation should not fail job
+            logger.exception("Failed to render HTML artifact for report %s", report.id)
+        # Best-effort PDF artifact
+        try:
+            from reportlab.lib.pagesizes import letter
+            from reportlab.pdfgen import canvas
+            pdf_path = Path(settings.artifacts_dir) / f"report_{report.id}.pdf"
+            c = canvas.Canvas(str(pdf_path), pagesize=letter)
+            c.setTitle(f"CompliancePulse Report #{report.id}")
+            y = 750
+            c.setFont("Helvetica-Bold", 14)
+            c.drawString(72, y, f"Report #{report.id} • {scan.hostname}")
+            y -= 22
+            c.setFont("Helvetica", 11)
+            c.drawString(72, y, f"Score: {report.score}%  Status: {report.status}  Severity: {report.severity}")
+            y -= 16
+            c.drawString(72, y, f"Benchmark: {report.benchmark_id}  Scan: {report.scan_id}")
+            y -= 24
+            summary = report.summary or ""
+            for i in range(0, len(summary), 90):
+                c.drawString(72, y, summary[i:i+90])
+                y -= 14
+            c.showPage()
+            c.save()
+        except Exception:  # pragma: no cover
+            logger.exception("Failed to render PDF artifact for report %s", report.id)
+
         self.session.add(scan)
         self.session.add(report)
         self.session.commit()

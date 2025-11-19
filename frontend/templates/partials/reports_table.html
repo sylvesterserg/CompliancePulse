@@ -6,8 +6,17 @@
       <p class="text-xs text-slate-500">Scan #{{ report.scan_id }}</p>
     </td>
     <td class="px-4 py-3">
-      <span class="text-2xl font-bold text-slate-900">{{ '%.0f'|format(report.score) }}%</span>
-      <p class="text-xs text-slate-500">{{ report.summary }}</p>
+      <div class="flex items-baseline gap-3">
+        <div>
+          <p class="text-[11px] uppercase tracking-wide text-slate-400">Compliance</p>
+          <span class="text-2xl font-bold text-emerald-600">{{ '%.0f'|format(report.score) }}%</span>
+        </div>
+        <div>
+          <p class="text-[11px] uppercase tracking-wide text-slate-400">Risk</p>
+          <span class="text-2xl font-bold text-rose-600">{{ '%.0f'|format(100 - report.score) }}%</span>
+        </div>
+      </div>
+      <p class="mt-1 text-xs text-slate-500">{{ report.summary }}</p>
       <p class="text-xs text-slate-400">{{ report.created_at.strftime('%b %d %H:%M') if report.created_at else '' }}</p>
     </td>
     <td class="px-4 py-3">

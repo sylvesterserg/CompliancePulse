@@ -1,27 +1,26 @@
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
   <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
     <div class="flex items-center justify-between">
-      <h2 class="text-lg font-semibold text-slate-900">Create Schedule</h2>
+      <h2 class="text-lg font-semibold text-slate-900">Edit Schedule</h2>
       <button class="text-slate-400 hover:text-slate-600" onclick="document.getElementById('modal-root').innerHTML=''">✕</button>
     </div>
     <form
       class="mt-4 space-y-4"
       method="post"
-      hx-post="/api/schedules/create"
+      hx-post="/api/schedules/{{ schedule.id }}/update"
       hx-target="#schedules-panel"
       hx-swap="outerHTML"
     >
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
       <div>
         <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Name</label>
-        <input name="name" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Daily baseline" required />
+        <input name="name" value="{{ schedule.name }}" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" required />
       </div>
       <div>
         <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Rule Group</label>
         <select name="group_id" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" required>
-          <option value="">Select group</option>
           {% for group in rule_groups %}
-          <option value="{{ group.id }}">{{ group.name }}</option>
+          <option value="{{ group.id }}" {% if group.id == schedule.group_id %}selected{% endif %}>{{ group.name }}</option>
           {% endfor %}
         </select>
       </div>
@@ -29,9 +28,9 @@
         <div>
           <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Frequency</label>
           <select name="frequency" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
-            <option value="hourly">Hourly</option>
-            <option value="daily" selected>Daily</option>
-            <option value="custom">Custom</option>
+            {% for opt in ['hourly','daily','custom'] %}
+            <option value="{{ opt }}" {% if schedule.frequency == opt %}selected{% endif %}>{{ opt|title }}</option>
+            {% endfor %}
           </select>
         </div>
         <div>
@@ -42,11 +41,10 @@
       </div>
       <div>
         <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Custom Interval (minutes)</label>
-        <input name="interval_minutes" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="120" />
-        <p class="mt-1 text-xs text-slate-400">Only used for custom frequency</p>
+        <input name="interval_minutes" value="{{ schedule.interval_minutes }}" class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
       </div>
       <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-600">
-        <input type="checkbox" name="enabled" checked class="h-4 w-4 rounded border-slate-300" />
+        <input type="checkbox" name="enabled" class="h-4 w-4 rounded border-slate-300" {% if schedule.enabled %}checked{% endif %} />
         Enabled
       </label>
       <div class="flex justify-end gap-3">
@@ -55,4 +53,5 @@
       </div>
     </form>
   </div>
+  
 </div>

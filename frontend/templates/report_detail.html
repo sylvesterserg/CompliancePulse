@@ -1,0 +1,29 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="flex items-center justify-between">
+  <div>
+    <h1 class="text-2xl font-semibold text-slate-900">Report #{{ report.id }}</h1>
+    <p class="text-sm text-slate-500">{{ report.hostname }} · {{ report.created_at.strftime('%b %d %Y %H:%M') if report.created_at else '' }}</p>
+  </div>
+  <div>
+    <a href="/reports/{{ report.id }}/download" class="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Download PDF</a>
+  </div>
+  
+</div>
+<div class="mt-6 grid gap-6 lg:grid-cols-3">
+  <div class="rounded-2xl bg-white p-6 shadow lg:col-span-2">
+    <h2 class="text-lg font-semibold text-slate-900">Summary</h2>
+    <p class="mt-2 text-sm text-slate-700">{{ report.summary }}</p>
+  </div>
+  <div class="rounded-2xl bg-white p-6 shadow">
+    <h2 class="text-lg font-semibold text-slate-900">Overview</h2>
+    <div class="mt-3 space-y-2 text-sm">
+      <div class="flex justify-between"><span class="text-slate-500">Score</span><span class="font-semibold">{{ '%.0f'|format(report.score) }}%</span></div>
+      <div class="flex justify-between"><span class="text-slate-500">Status</span><span class="font-semibold">{{ report.status|title }}</span></div>
+      <div class="flex justify-between"><span class="text-slate-500">Severity</span><span class="font-semibold">{{ report.severity|title }}</span></div>
+      <div class="flex justify-between"><span class="text-slate-500">Benchmark</span><span class="font-semibold">{{ report.benchmark_id }}</span></div>
+      <div class="flex justify-between"><span class="text-slate-500">Scan</span><span class="font-semibold">#{{ report.scan_id }}</span></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

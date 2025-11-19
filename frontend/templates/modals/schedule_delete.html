@@ -1,0 +1,20 @@
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50">
+  <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-slate-900">Delete Schedule</h2>
+      <button class="text-slate-400 hover:text-slate-600" onclick="document.getElementById('modal-root').innerHTML=''">✕</button>
+    </div>
+    <p class="mt-4 text-sm text-slate-600">Are you sure you want to remove the schedule <strong>{{ schedule.name }}</strong>?</p>
+    <form
+      class="mt-6 flex justify-end gap-3"
+      method="post"
+      hx-post="/api/schedules/{{ schedule.id }}/delete"
+      hx-target="#schedules-panel"
+      hx-swap="outerHTML"
+    >
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+      <button type="button" class="rounded-full px-4 py-2 text-sm font-semibold text-slate-500" onclick="document.getElementById('modal-root').innerHTML=''">Cancel</button>
+      <button type="submit" class="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500">Delete</button>
+    </form>
+  </div>
+</div>

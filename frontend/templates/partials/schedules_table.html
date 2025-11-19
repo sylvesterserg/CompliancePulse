@@ -20,15 +20,20 @@
         <td class="px-4 py-3 text-sm text-slate-600">{{ schedule.next_run.strftime('%b %d %H:%M') if schedule.next_run else 'Pending' }}</td>
         <td class="px-4 py-3 text-right">
           {% if can_manage %}
-          <button
-            class="text-xs font-semibold text-rose-600 hover:text-rose-500"
-            hx-delete="/automation/schedules/{{ schedule.id }}"
-            hx-target="#schedules-panel"
-            hx-swap="outerHTML"
-            hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
-          >
-            Remove
-          </button>
+          <div class="flex items-center justify-end gap-3">
+            <button
+              class="text-xs font-semibold text-slate-700 hover:text-slate-900"
+              hx-get="/api/schedules/modal/edit/{{ schedule.id }}"
+              hx-target="#modal-root"
+              hx-swap="innerHTML"
+            >Edit</button>
+            <button
+              class="text-xs font-semibold text-rose-600 hover:text-rose-500"
+              hx-get="/api/schedules/modal/delete/{{ schedule.id }}"
+              hx-target="#modal-root"
+              hx-swap="innerHTML"
+            >Delete</button>
+          </div>
           {% else %}
           <span class="text-xs text-slate-400">Managed by admin</span>
           {% endif %}

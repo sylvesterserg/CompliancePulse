@@ -65,6 +65,16 @@ def create_scan(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@router.post("/trigger")
+def trigger_scan_alias(
+    payload: ScanRequest,
+    request: Request,
+    service: ScanService = Depends(_get_service),
+    api_key=Depends(get_optional_api_key),
+):
+    return create_scan(payload, request, service, api_key)
+
+
 @router.get("", response_model=List[ScanSummary])
 def list_scans(service: ScanService = Depends(_get_service)) -> JSONResponse:
     payload = jsonable_encoder(service.list_scans())
@@ -81,6 +91,11 @@ def get_scan(scan_id: int, service: ScanService = Depends(_get_service)) -> JSON
         return JSONResponse(payload, headers={"x-test-json-body": _json.dumps(payload)})
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.get("/{scan_id}/detail")
+def get_scan_detail_alias(scan_id: int, service: ScanService = Depends(_get_service)) -> JSONResponse:
+    return get_scan(scan_id, service)
 
 
 @router.get("/{scan_id}/report")

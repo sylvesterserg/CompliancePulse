@@ -616,6 +616,30 @@ async def reports_page(
     return _templates().TemplateResponse("reports.html", context)
 
 
+@router.get("/reports/{report_id}", response_class=HTMLResponse)
+async def report_detail_page(
+    report_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> Response:
+    context_tuple = _resolve_ui_context(request, session)
+    if not context_tuple:
+        if _wants_json(request):
+            return _json_payload({"error": "unauthorized", "status": 401}, status_code=401)
+        return _redirect_to_login()
+    user, organization, organizations, membership = context_tuple
+    scan_service = ScanService(session, organization.id)
+    try:
+        report = scan_service.get_report(report_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    context = {
+        **_base_context(request, session, "reports", user, organization, organizations, membership),
+        "report": report,
+    }
+    return _templates().TemplateResponse("report_detail.html", context)
+
+
 @router.get("/schedules")
 async def schedules_alias_json(
     request: Request,

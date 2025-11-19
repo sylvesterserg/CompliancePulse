@@ -8,6 +8,7 @@
     <td class="px-4 py-3">
       <span class="text-2xl font-bold text-slate-900">{{ '%.0f'|format(report.score) }}%</span>
       <p class="text-xs text-slate-500">{{ report.summary }}</p>
+      <p class="text-xs text-slate-400">{{ report.created_at.strftime('%b %d %H:%M') if report.created_at else '' }}</p>
     </td>
     <td class="px-4 py-3">
       <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{{ report.status|title }}</span>
@@ -21,6 +22,7 @@
       >
         View
       </button>
+      <a href="/reports/{{ report.id }}" class="ml-2 text-xs font-semibold text-indigo-600 hover:text-indigo-500">Open</a>
       <a
         href="/reports/{{ report.id }}/download"
         class="ml-2 rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"

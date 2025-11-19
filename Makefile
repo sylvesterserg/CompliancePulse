@@ -25,7 +25,7 @@ COMPOSE := $(shell \
     echo ""; \
   fi)
 
-.PHONY: install dev test lint format build up down logs clean
+.PHONY: install dev test lint format build up down logs prod-build prod-up prod-down prod-logs clean
 
 install:
 	@if [ "$(HAVE_UV)" = "1" ]; then \
@@ -130,8 +130,39 @@ logs:
 	fi; \
 	$(COMPOSE) -f docker-compose.yml logs -f --tail=200
 
+prod-build:
+	@echo "[build:prod] Building production images"
+	@if [ -z "$(COMPOSE)" ]; then \
+		echo "No compose tool found (docker-compose, docker compose, or podman-compose)."; \
+		exit 1; \
+	fi; \
+	$(COMPOSE) -f docker-compose.prod.yml build
+
+prod-up:
+	@echo "[up:prod] Starting production stack (api, worker, scheduler, nginx)"
+	@if [ -z "$(COMPOSE)" ]; then \
+		echo "No compose tool found (docker-compose, docker compose, or podman-compose)."; \
+		exit 1; \
+	fi; \
+	$(COMPOSE) -f docker-compose.prod.yml up -d
+
+prod-down:
+	@echo "[down:prod] Stopping production stack"
+	@if [ -z "$(COMPOSE)" ]; then \
+		echo "No compose tool found (docker-compose, docker compose, or podman-compose)."; \
+		exit 1; \
+	fi; \
+	$(COMPOSE) -f docker-compose.prod.yml down
+
+prod-logs:
+	@echo "[logs:prod] Tailing production logs"
+	@if [ -z "$(COMPOSE)" ]; then \
+		echo "No compose tool found (docker-compose, docker compose, or podman-compose)."; \
+		exit 1; \
+	fi; \
+	$(COMPOSE) -f docker-compose.prod.yml logs -f --tail=200
+
 clean:
 	@echo "[clean] Removing caches and artifacts"
 	@rm -rf .pytest_cache **/__pycache__ **/*.pyc build dist .ruff_cache || true
 	@echo "[clean] To remove virtualenv as well: rm -rf $(VENV_DIR)"
-

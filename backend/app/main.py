@@ -86,7 +86,9 @@ async def session_middleware(request: Request, call_next):
 # Prefer UI routes first so JSON fallbacks apply to bare paths in tests
 app.include_router(ui_router.router)
 app.include_router(auth_router, prefix="/api/auth")
+# Organization management routes exposed under both /api and /org for UI links
 app.include_router(auth_org_router, prefix="/api")
+app.include_router(auth_org_router, prefix="/org")
 app.include_router(benchmarks.router, prefix="/api")
 app.include_router(rules.router, prefix="/api")
 app.include_router(scans.router, prefix="/api")
@@ -187,8 +189,8 @@ def api_root() -> dict[str, str]:
     return {"service": settings.app_name, "version": settings.version, "status": "running"}
 
 
-@app.get("/health")
-def health() -> dict[str, str]:
+@app.get("/api/health")
+def api_health() -> dict[str, str]:
     with Session(engine) as session:
         session.exec(select(Benchmark).limit(1))
     payload = {"status": "healthy", "database": "connected"}
@@ -196,6 +198,12 @@ def health() -> dict[str, str]:
     from fastapi.responses import JSONResponse
     import json as _json
     return JSONResponse(payload, headers={"x-test-json-body": _json.dumps(payload)})
+
+
+# Backward-compatible alias
+@app.get("/health")
+def health_alias() -> dict[str, str]:
+    return api_health()
 
 
 # Public API endpoints
